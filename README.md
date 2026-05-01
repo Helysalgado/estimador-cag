@@ -2,6 +2,19 @@
 
 Servicio API para generar estimaciones de proyectos de software a partir de una **transcripción de reunión**, usando Context-Augmented Generation (CAG) con un modelo de lenguaje (OpenAI).
 
+## Tools / Stack
+
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white)
+![Uvicorn](https://img.shields.io/badge/Uvicorn-Server-2C3E50)
+![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063)
+![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?logo=pytest&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?logo=githubactions&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker_Compose-1D63ED?logo=docker&logoColor=white)
+![uv](https://img.shields.io/badge/uv-package_manager-DE5FE9)
+
 ## Requisitos
 
 - Python 3.11+ ([`.python-version`](.python-version))
