@@ -11,5 +11,6 @@ wheels/
 .env
 
 # Old files
-*/*old.py
-
+*/*_old.py
+*/*/*_old.py
+*_old.py
