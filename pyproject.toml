@@ -5,11 +5,13 @@ description = "API de estimación de software con CAG (OpenAI)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "anthropic>=0.50.0",
     "fastapi>=0.136.1",
     "lru-cache>=0.2.3",
     "openai>=2.33.0",
     "pydantic-settings>=2.14.0",
     "python-dotenv>=1.2.2",
+    "streamlit>=1.45.0",
     "uvicorn>=0.46.0",
 ]
 

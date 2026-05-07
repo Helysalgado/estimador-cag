@@ -19,12 +19,13 @@ Servicio API para generar estimaciones de proyectos de software a partir de una 
 
 - Python 3.11+ ([`.python-version`](.python-version))
 - [uv](https://docs.astral.sh/uv/) (recomendado) o pip
+- API key de OpenAI y/o Anthropic en `.env` (sin hardcode)
 
 ## Configuración
 
 ```bash
 cp .env.example .env
-# Edita .env y define OPENAI_API_KEY para llamadas reales al modelo.
+# Edita .env y define OPENAI_API_KEY y/o ANTHROPIC_API_KEY.
 ```
 
 ## Ejecución local
@@ -37,6 +38,29 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - Documentación interactiva: `http://localhost:8000/docs`
 - Salud del servicio: `GET http://localhost:8000/health`
 - Estimación: `POST http://localhost:8000/api/v1/estimate` con cuerpo JSON `{ "transcription": "..." }`
+
+## Interfaz conversacional (Streamlit)
+
+La interfaz web de chat está en `streamlit_app.py` y permite:
+
+- pegar transcripciones y recibir estimación de software en formato conversacional;
+- ver la respuesta en streaming (token a token);
+- elegir proveedor primario (`openai` o `anthropic`) y fallback automático;
+- revisar en sidebar el system prompt activo, contexto CAG y métricas de la última llamada.
+
+### Ejecutar Streamlit
+
+```bash
+uv sync --extra dev
+uv run streamlit run streamlit_app.py
+```
+
+### Buenas prácticas de operación
+
+- Configura API keys vía `.env` o `st.secrets`; nunca en el código.
+- Usa `openai` y `anthropic` como proveedores válidos en la UI.
+- Si el primario falla por errores recuperables (timeout/rate limit/5xx), la app reintenta automáticamente con el fallback.
+- Mantén transcripciones con suficiente detalle (mínimo 50 caracteres) para respetar validación del esquema.
 
 ### Transcripción para el ejercicio
 
