@@ -36,6 +36,29 @@ def _create_session(client: httpx.Client) -> str:
     return response.json()["session_id"]
 
 
+def _response_is_session_not_found(response: httpx.Response) -> bool:
+    if response.status_code != 404:
+        return False
+    try:
+        payload = response.json()
+        detail = payload.get("detail")
+        if isinstance(detail, dict):
+            return detail.get("error") == "session_not_found"
+    except Exception:
+        pass
+    return False
+
+
+def _is_session_not_found(exc: httpx.HTTPStatusError) -> bool:
+    return _response_is_session_not_found(exc.response)
+
+
+def _refresh_session_after_api_restart() -> str:
+    """Create a new server-side session when the API process was restarted."""
+    with httpx.Client() as client:
+        return _create_session(client)
+
+
 def _ensure_session_state() -> None:
     if "session_id" not in st.session_state:
         with httpx.Client() as client:
@@ -56,6 +79,7 @@ def _post_session_turn(
     transcript: str,
     uploaded_files: list,
     prompt_version: str,
+    allow_session_recovery: bool = True,
 ) -> dict:
     files: list[tuple[str, tuple[str, bytes, str]]] = []
     for uploaded in uploaded_files:
@@ -72,6 +96,16 @@ def _post_session_turn(
             params={"prompt_version": prompt_version},
             timeout=HTTP_TIMEOUT,
         )
+        if allow_session_recovery and _response_is_session_not_found(response):
+            st.session_state.session_id = _refresh_session_after_api_restart()
+            st.session_state.turn_count = 0
+            st.session_state.session_recovered = True
+            return _post_session_turn(
+                transcript=transcript,
+                uploaded_files=uploaded_files,
+                prompt_version=prompt_version,
+                allow_session_recovery=False,
+            )
         response.raise_for_status()
         return response.json()
 
@@ -124,12 +158,23 @@ with tab_chat:
                         prompt_version=prompt_version,
                     )
                 except httpx.HTTPStatusError as exc:
+                    if _is_session_not_found(exc):
+                        st.warning(
+                            "La sesión ya no existe en el API (suele pasar si reiniciaste "
+                            "uvicorn). Pulsa **Nueva conversación** o recarga tras actualizar "
+                            "Streamlit para recuperación automática."
+                        )
                     st.error(_format_http_error(exc))
                     st.session_state.messages.pop()
                 except httpx.HTTPError as exc:
                     st.error(f"No se pudo conectar con el API en `{API_BASE_URL}`: {exc}")
                     st.session_state.messages.pop()
                 else:
+                    if st.session_state.pop("session_recovered", False):
+                        st.info(
+                            "Se creó una sesión nueva en el API (la anterior se perdió al "
+                            "reiniciar el servidor)."
+                        )
                     assistant_text = body.get("text", "")
                     st.session_state.messages.append(
                         {"role": "assistant", "content": assistant_text},
