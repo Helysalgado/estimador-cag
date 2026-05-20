@@ -1,25 +1,30 @@
-# Transcripciones de reunión (ejercicio)
+# Documentación del proyecto
 
-Este directorio guarda el material de texto que sirve de **entrada** para la estimación.
+## Planes de implementación (Sesión 4)
 
-## Archivo principal del ejercicio
+Los pasos para migrar a formulario tipado + prompts Jinja2 están en:
 
-- **`transcripcion-reunion.md`**: transcripción de ejemplo (o la que asigne el instructor). Es la referencia por defecto mencionada en el README del proyecto.
+**[`plans/session-04/`](./plans/session-04/README.md)**
 
-## Formato recomendado
+## Texto de entrada de ejemplo
 
-- Markdown o texto plano.
-- Incluir contexto suficiente: objetivo del producto, usuarios, integraciones, plazos mencionados y restricciones.
-- No incluir datos personales reales; usa datos ficticios si el ejercicio lo requiere.
+- **`transcripcion-reunion.md`**: reunión ficticia con un cliente. Puedes pegar su contenido en el campo **`description`** del formulario Streamlit o del body JSON del API (mínimo 20 caracteres, máximo 80.000).
 
-## Cómo usarla con la API
-
-Envía el contenido completo (o un extracto representativo) como JSON:
+### Ejemplo de body JSON
 
 ```json
 {
-  "transcription": "Pega aquí el texto de transcripcion-reunion.md"
+  "description": "Pega aquí el contenido de transcripcion-reunion.md",
+  "project_type": "web_saas",
+  "detail_level": "medium",
+  "output_format": "phases_table"
 }
 ```
 
-al endpoint `POST /api/v1/estimate`.
+Endpoint: `POST http://localhost:8000/api/v1/estimate`
+
+## Formato recomendado para `description`
+
+- Objetivo del producto, usuarios, funcionalidades clave.
+- Integraciones, restricciones y plazos mencionados.
+- Datos ficticios si el ejercicio lo requiere (sin PII real).

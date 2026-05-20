@@ -1,76 +1,52 @@
-from datetime import datetime
-
-from openai import OpenAI
-
 from app.config import settings
-from app.context.examples import ESTIMATION_EXAMPLES
+from app.prompts import render_estimation_prompt
+from app.schemas.estimation import EstimationRequest, EstimationResponse
+from app.services.cache import build_cache, make_key
+from app.services.llm_wrapper import WrapperConfig, generate_sync, get_default_wrapper_config
+
+PROMPT_VERSION = "v1"
+
+cache = build_cache(
+    redis_url=settings.REDIS_URL,
+    cache_ttl_seconds=settings.CACHE_TTL_SECONDS,
+)
 
 
-def build_system_prompt() -> str:
-    """
-    Construye el system prompt con:
-    - rol del modelo
-    - instrucciones claras
-    - ejemplos (few-shot)
-    """
-
-    intro = (
-        "Eres un experto en estimación de proyectos de software. "
-        "Tu tarea es analizar una transcripción de reunión con un cliente "
-        "y generar una estimación estructurada basada en ejemplos previos.\n\n"
-        "Debes seguir el mismo formato que los ejemplos.\n"
-        "Sé claro, estructurado y realista en tiempos y recursos.\n"
-        "Debes verificar que el total de horas sea consistente con la duración estimada y el tamaño del equipo. Si no lo es, ajusta la duración o el equipo."
-        "Si el cliente menciona un plazo, evalúa si es realista y ajusta la estimación en consecuencia."
-        "Debes siempre validar que la estimación sea coherente entre horas, equipo y duración. Incluye una sección de evaluación del plazo."
+def estimate_from_request(
+    request: EstimationRequest,
+    *,
+    prompt_version: str = PROMPT_VERSION,
+) -> EstimationResponse:
+    """Generate an estimation from a typed request using Jinja prompts and Redis cache."""
+    system_prompt, user_message = render_estimation_prompt(request, version=prompt_version)
+    config: WrapperConfig = get_default_wrapper_config()
+    cache_key = make_key(
+        system_prompt=system_prompt,
+        user_message=user_message,
+        model=f"{config.provider}/{config.model}",
+        max_tokens=config.max_tokens,
+        thinking_budget=config.thinking_budget,
     )
+    cached = cache.get(cache_key)
+    if cached is not None:
+        text = cached.get("text") or cached.get("estimation", "")
+        version = cached.get("prompt_version", prompt_version)
+        return EstimationResponse(text=text, prompt_version=version)
 
-    examples_text = "\n\n=== EJEMPLOS DE REFERENCIA ===\n"
-
-    for i, example in enumerate(ESTIMATION_EXAMPLES, start=1):
-        examples_text += f"\n--- Ejemplo {i} ---\n"
-        examples_text += f"Resumen:\n{example['meeting_summary']}\n\n"
-        examples_text += f"Estimación:\n{example['estimation']}\n"
-
-    return intro + examples_text
-
-
-def estimate_project(meeting_transcript: str) -> dict:
-    """
-    Genera una estimación a partir de la transcripción de una reunión.
-    """
-
-    if settings.LLM_PROVIDER != "openai":
-        raise ValueError("Solo OpenAI está implementado actualmente")
-
-    if not settings.OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY es requerida para usar OpenAI")
-
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-
-    system_prompt = build_system_prompt()
-
-    user_prompt = (
-        "A continuación tienes la transcripción de una reunión con un cliente.\n"
-        "Genera una estimación siguiendo el formato de los ejemplos.\n\n"
-        f"Transcripción:\n{meeting_transcript}"
+    result = generate_sync(
+        system_prompt=system_prompt,
+        user_message=user_message,
+        config=config,
     )
-
-    response = client.responses.create(
-        model=settings.LLM_MODEL,
-        input=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.3,
-        max_output_tokens=800,
+    response = EstimationResponse(
+        text=result["estimation"],
+        prompt_version=prompt_version,
     )
-
-    return {
-        "estimation": response.output_text,
-        "model": settings.LLM_MODEL,
-        "provider": settings.LLM_PROVIDER,
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-
-
+    cache.set(
+        cache_key,
+        {
+            "text": response.text,
+            "prompt_version": response.prompt_version,
+        },
+    )
+    return response

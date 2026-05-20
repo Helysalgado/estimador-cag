@@ -6,8 +6,8 @@ from app.routers import estimations
 app = FastAPI(
     title="Estimador CAG API",
     description=(
-        "API para generar estimaciones de proyectos de software utilizando "
-        "Context-Augmented Generation (CAG) con modelos de lenguaje."
+        "API para estimar proyectos de software desde un formulario tipado. "
+        "Prompts versionados en Jinja2; respuesta en texto libre."
     ),
     version="0.1.0"
 )
