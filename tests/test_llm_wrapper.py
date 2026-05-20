@@ -1,6 +1,11 @@
 import pytest
 
-from app.services.llm_wrapper import WrapperConfig, generate_sync, stream_events
+from app.services.llm_wrapper import (
+    WrapperConfig,
+    generate_sync,
+    generate_sync_messages,
+    stream_events,
+)
 
 
 class _Message:
@@ -18,6 +23,25 @@ class _Response:
     def __init__(self, content: str):
         self.choices = [_Choice(content)]
         self.usage = type("Usage", (), {"prompt_tokens": 11, "completion_tokens": 22})()
+
+
+def test_generate_sync_messages_accepts_multi_turn_list(monkeypatch):
+    captured: dict = {}
+
+    def fake_completion(**kwargs):  # noqa: ANN003
+        captured["messages"] = kwargs["messages"]
+        return _Response("Multi-turn reply")
+
+    monkeypatch.setattr("app.services.llm_wrapper.completion", fake_completion)
+    messages = [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "reply"},
+        {"role": "user", "content": "second"},
+    ]
+    result = generate_sync_messages(messages=messages, config=WrapperConfig(provider="openai", model="gpt-4o-mini"))
+    assert captured["messages"] == messages
+    assert result["estimation"] == "Multi-turn reply"
 
 
 def test_generate_sync_uses_fallback_on_recoverable_error(monkeypatch):

@@ -5,7 +5,7 @@ import structlog
 from fastapi import FastAPI
 
 from app.config import settings
-from app.routers import estimations
+from app.routers import estimations, sessions
 
 
 @asynccontextmanager
@@ -46,6 +46,7 @@ app = FastAPI(
 # -------------------------
 
 app.include_router(estimations.router)
+app.include_router(sessions.router)
 
 
 # -------------------------

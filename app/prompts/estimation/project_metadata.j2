@@ -1,0 +1,23 @@
+{% if project_metadata %}
+<project_metadata>
+The following items are stable facts from the ongoing conversation. Treat them as established context; do not contradict them unless the user explicitly revises them in the latest message.
+{% if project_metadata.project_name %}
+- project_name: {{ project_metadata.project_name }}
+{% endif %}
+{% if project_metadata.assumed_team_size is not none %}
+- assumed_team_size: {{ project_metadata.assumed_team_size }}
+{% endif %}
+{% if project_metadata.mentioned_technologies %}
+- mentioned_technologies: {{ project_metadata.mentioned_technologies | join(", ") }}
+{% endif %}
+{% if project_metadata.agreed_scope %}
+- agreed_scope: {{ project_metadata.agreed_scope }}
+{% endif %}
+{% if project_metadata.explicit_constraints %}
+- explicit_constraints: {{ project_metadata.explicit_constraints | join("; ") }}
+{% endif %}
+{% if project_metadata.rejected_options %}
+- rejected_options: {{ project_metadata.rejected_options | join("; ") }}
+{% endif %}
+</project_metadata>
+{% endif %}

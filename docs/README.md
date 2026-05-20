@@ -1,10 +1,12 @@
 # Documentación del proyecto
 
-## Planes de implementación (Sesión 4)
+## Planes de implementación
 
-Los pasos para migrar a formulario tipado + prompts Jinja2 están en:
+- Sesión 4 (formulario tipado + prompts Jinja2):
+  - **[`plans/session-04/`](./plans/session-04/README.md)**
 
-**[`plans/session-04/`](./plans/session-04/README.md)**
+- Sesión 5 (memoria conversacional + adjuntos):
+  - **[`plans/session-05/`](./plans/session-05/README.md)**
 
 ## Texto de entrada de ejemplo
 

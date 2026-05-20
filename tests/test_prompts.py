@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 from jinja2 import Environment, StrictUndefined, UndefinedError
 
-from app.prompts.loader import render_estimation_prompt
+from app.prompts.loader import render_estimation_prompt, render_session_system_prompt
+from app.services.sessions import ProjectMetadata
 from structlog.testing import capture_logs
 
 from app.schemas.estimation import (
@@ -110,6 +111,50 @@ def test_reference_projects_block_absent_when_none() -> None:
     request = _make_request()
     system, _ = render_estimation_prompt(request)
     assert "<reference_projects>" not in system
+
+
+def test_project_metadata_block_absent_when_empty() -> None:
+    request = _make_request()
+    empty = ProjectMetadata()
+    assert not empty.has_content()
+
+    system, _ = render_estimation_prompt(request, project_metadata=empty)
+    assert "<project_metadata>" not in system
+
+
+def test_project_metadata_block_present_when_populated() -> None:
+    request = _make_request()
+    metadata = ProjectMetadata(
+        project_name="InventoryHub-Unique",
+        assumed_team_size=4,
+        mentioned_technologies=["React", "PostgreSQL"],
+        agreed_scope="MVP for warehouse stock tracking",
+        explicit_constraints=["Must launch before Q4"],
+        rejected_options=["Native mobile first"],
+    )
+    system, _ = render_estimation_prompt(request, project_metadata=metadata)
+    assert "<project_metadata>" in system
+    assert "InventoryHub-Unique" in system
+    assert "React, PostgreSQL" in system
+    assert "Must launch before Q4" in system
+    assert "Native mobile first" in system
+    assert "stable facts" in system.lower()
+
+
+def test_project_metadata_in_v1_and_v2_system() -> None:
+    metadata = ProjectMetadata(project_name="CrossVersionMarker")
+    request = _make_request()
+    v1_system, _ = render_estimation_prompt(request, version="v1", project_metadata=metadata)
+    v2_system, _ = render_estimation_prompt(request, version="v2", project_metadata=metadata)
+    assert "CrossVersionMarker" in v1_system
+    assert "CrossVersionMarker" in v2_system
+
+
+def test_render_session_system_prompt_includes_metadata() -> None:
+    metadata = ProjectMetadata(agreed_scope="Session-only scope marker")
+    system = render_session_system_prompt(project_metadata=metadata, version="v1")
+    assert "<project_metadata>" in system
+    assert "Session-only scope marker" in system
 
 
 def test_structlog_prompt_rendered_event() -> None:

@@ -57,12 +57,12 @@ def _base_messages(system_prompt: str, user_message: str) -> list[dict[str, str]
     ]
 
 
-def generate_sync(
+def generate_sync_messages(
     *,
-    system_prompt: str,
-    user_message: str,
+    messages: list[dict[str, str]],
     config: WrapperConfig,
 ) -> dict:
+    """Call the LLM with a full OpenAI-style message list (multi-turn safe)."""
     started = time.perf_counter()
     attempts: list[tuple[str, str]] = [(config.provider, config.model)]
     if config.fallback_provider:
@@ -79,7 +79,7 @@ def generate_sync(
         try:
             response = completion(
                 model=_provider_model(provider, model),
-                messages=_base_messages(system_prompt, user_message),
+                messages=messages,
                 max_tokens=config.max_tokens,
                 temperature=config.temperature,
             )
@@ -105,6 +105,19 @@ def generate_sync(
                 continue
             raise
     raise RuntimeError("No se pudo generar respuesta con los proveedores configurados.")
+
+
+def generate_sync(
+    *,
+    system_prompt: str,
+    user_message: str,
+    config: WrapperConfig,
+) -> dict:
+    """Single-turn helper: system plus one user message."""
+    return generate_sync_messages(
+        messages=_base_messages(system_prompt, user_message),
+        config=config,
+    )
 
 
 def complete_stream(

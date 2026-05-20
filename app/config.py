@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4o-mini"
     REDIS_URL: str = "redis://localhost:6379/0"
     CACHE_TTL_SECONDS: int = 86400
+    SESSION_MAX_TURNS: int = 6
+    MAX_ATTACHMENT_BYTES: int = 5_000_000
+    MAX_ATTACHMENTS_PER_REQUEST: int = 5
     APP_ENV: str = "development"
     LOG_LEVEL: str = "DEBUG"
 

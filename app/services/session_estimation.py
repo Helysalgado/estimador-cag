@@ -1,0 +1,149 @@
+"""Multi-turn session estimation: LLM orchestration and metadata heuristics."""
+
+from __future__ import annotations
+
+import re
+
+import structlog
+
+from app.prompts.loader import render_session_system_prompt
+from app.schemas.sessions import ProjectMetadataView, SessionEstimationResponse
+from app.services.llm_wrapper import WrapperConfig, generate_sync_messages, get_default_wrapper_config
+from app.services.sessions import ProjectMetadata, Session
+
+log = structlog.get_logger(__name__)
+
+PROMPT_VERSION = "v1"
+
+TECH_KEYWORDS: dict[str, str] = {
+    "react": "React",
+    "vue": "Vue",
+    "angular": "Angular",
+    "python": "Python",
+    "django": "Django",
+    "fastapi": "FastAPI",
+    "node": "Node.js",
+    "nodejs": "Node.js",
+    "postgresql": "PostgreSQL",
+    "postgres": "PostgreSQL",
+    "mongodb": "MongoDB",
+    "redis": "Redis",
+    "kubernetes": "Kubernetes",
+    "aws": "AWS",
+    "azure": "Azure",
+    "flutter": "Flutter",
+    "swift": "Swift",
+    "kotlin": "Kotlin",
+    "typescript": "TypeScript",
+    "javascript": "JavaScript",
+    "java": "Java",
+    "spring": "Spring",
+    "docker": "Docker",
+    "streamlit": "Streamlit",
+}
+
+_PROJECT_NAME_PATTERNS = (
+    re.compile(
+        r"project\s+(?:called|named)\s+[\"']?([A-Za-z0-9][A-Za-z0-9\-]{2,48})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"app\s+(?:called|named)\s+[\"']?([A-Za-z0-9][A-Za-z0-9\-]{2,48})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"proyecto\s+[\"']?([A-Za-z0-9][A-Za-z0-9\-]{2,48})",
+        re.IGNORECASE,
+    ),
+)
+
+_TEAM_SIZE_PATTERN = re.compile(
+    r"team\s+of\s+(\d{1,2})|(\d{1,2})\s+developers?",
+    re.IGNORECASE,
+)
+
+_REJECTED_PATTERN = re.compile(
+    r"(?:don't want|do not want|not interested in|reject(?:ing)?|instead of)\s+([^.!?\n]{3,80})",
+    re.IGNORECASE,
+)
+
+
+def update_metadata_from_turn(
+    metadata: ProjectMetadata,
+    user_turn: str,
+    assistant_text: str,
+) -> None:
+    """Apply lightweight heuristics after each completed turn."""
+    combined = f"{user_turn}\n{assistant_text}"
+    combined_lower = combined.lower()
+
+    for keyword, label in TECH_KEYWORDS.items():
+        if keyword in combined_lower and label not in metadata.mentioned_technologies:
+            metadata.mentioned_technologies.append(label)
+
+    if metadata.project_name is None:
+        for pattern in _PROJECT_NAME_PATTERNS:
+            match = pattern.search(user_turn)
+            if match:
+                metadata.project_name = match.group(1).strip().rstrip(".,;")
+                break
+
+    team_match = _TEAM_SIZE_PATTERN.search(user_turn)
+    if team_match:
+        size = team_match.group(1) or team_match.group(2)
+        if size:
+            metadata.assumed_team_size = int(size)
+
+    scope = user_turn.strip()
+    if scope:
+        metadata.agreed_scope = scope[:300] + ("…" if len(scope) > 300 else "")
+
+    for sentence in re.split(r"[.!?\n]+", user_turn):
+        lowered = sentence.lower()
+        if "must " in lowered or "cannot " in lowered or "can't " in lowered:
+            constraint = sentence.strip()
+            if constraint and constraint not in metadata.explicit_constraints:
+                metadata.explicit_constraints.append(constraint[:200])
+
+    for match in _REJECTED_PATTERN.finditer(user_turn):
+        option = match.group(1).strip().rstrip(".,;")
+        if option and option not in metadata.rejected_options:
+            metadata.rejected_options.append(option[:120])
+
+
+def estimate_session_turn(
+    session: Session,
+    user_turn: str,
+    *,
+    prompt_version: str = PROMPT_VERSION,
+    config: WrapperConfig | None = None,
+) -> SessionEstimationResponse:
+    """Run one conversational turn: LLM call, history update, metadata refresh."""
+    config = config or get_default_wrapper_config()
+    system_prompt = render_session_system_prompt(
+        project_metadata=session.metadata,
+        version=prompt_version,
+    )
+    messages = session.history.build_messages(
+        system_prompt,
+        current_user=user_turn,
+    )
+    result = generate_sync_messages(messages=messages, config=config)
+    assistant_text = result.get("estimation") or ""
+
+    session.history.add_turn(user_turn, assistant_text)
+    update_metadata_from_turn(session.metadata, user_turn, assistant_text)
+
+    log.info(
+        "session_turn_completed",
+        session_id=session.session_id,
+        prompt_version=prompt_version,
+        history_turns=session.history.turn_count,
+        metadata_populated=session.metadata.has_content(),
+    )
+    return SessionEstimationResponse(
+        text=assistant_text,
+        prompt_version=prompt_version,
+        turn_count=session.history.turn_count,
+        project_metadata=ProjectMetadataView.model_validate(session.metadata),
+    )
