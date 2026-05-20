@@ -37,7 +37,7 @@ Marca aquí conforme avances (o pídele al agente que lo actualice):
 - [x] Paso 4 — Streamlit
 - [x] Paso 5 — Tests
 - [x] Paso 6 — README y entregable
-- [ ] Paso 7 — Bonus (opcional)
+- [x] Paso 7 — Bonus (opcional)
 
 ## Referencias
 

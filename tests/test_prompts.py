@@ -6,11 +6,14 @@ import pytest
 from jinja2 import Environment, StrictUndefined, UndefinedError
 
 from app.prompts.loader import render_estimation_prompt
+from structlog.testing import capture_logs
+
 from app.schemas.estimation import (
     DetailLevel,
     EstimationRequest,
     OutputFormat,
     ProjectType,
+    ReferenceProject,
 )
 
 
@@ -76,3 +79,44 @@ def test_unknown_version_raises() -> None:
     request = _make_request()
     with pytest.raises(Exception):
         render_estimation_prompt(request, version="v999")
+
+
+def test_v2_system_differs_from_v1() -> None:
+    request = _make_request()
+    v1_system, _ = render_estimation_prompt(request, version="v1")
+    v2_system, _ = render_estimation_prompt(request, version="v2")
+    assert "BONUS_V2_PROFILE" in v2_system
+    assert "BONUS_V2_PROFILE" not in v1_system
+    assert "V2_CALIBRATION_SET" in v2_system
+    assert "V2_CALIBRATION_SET" not in v1_system
+
+
+def test_reference_projects_rendered_when_present() -> None:
+    refs = [
+        ReferenceProject(
+            name="RefCRM-UniqueMarker",
+            description="Internal CRM for pipeline tracking and approvals.",
+            estimated_weeks=14,
+        )
+    ]
+    request = _make_request(reference_projects=refs)
+    system, _ = render_estimation_prompt(request)
+    assert "<reference_projects>" in system
+    assert "RefCRM-UniqueMarker" in system
+    assert "14" in system
+
+
+def test_reference_projects_block_absent_when_none() -> None:
+    request = _make_request()
+    system, _ = render_estimation_prompt(request)
+    assert "<reference_projects>" not in system
+
+
+def test_structlog_prompt_rendered_event() -> None:
+    with capture_logs() as cap:
+        render_estimation_prompt(_make_request())
+    events = [log.get("event") for log in cap]
+    assert "prompt_rendered" in events
+    entry = next(log for log in cap if log.get("event") == "prompt_rendered")
+    assert entry.get("prompt_template_version") == "v1"
+    assert len(entry.get("content_sha256", "")) == 64

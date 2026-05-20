@@ -1,53 +1,38 @@
 # Paso 7 — Bonus (opcional)
 
-> **Depende de:** Paso 6 completado.  
-> **Solo si hay tiempo antes del directo.**
+> **Depende de:** Paso 6 completado.
 
-## 7.1 Versionado real (`prompt_version=v2`)
+## Objetivo
 
-- Duplicar `app/prompts/estimation/v1/` → `v2/` con variación deliberada (tono, ejemplos, reglas).
-- Query param en router: `POST /api/v1/estimate?prompt_version=v2`
-- Pasar `version` a `render_estimation_prompt(request, version=...)`
-- Devolver `prompt_version` dinámico en `EstimationResponse`
-- Tests: render v2 distinto de v1 en al menos un string clave
+Extensiones alineadas al bonus de la sesión: **v2** por query param, **`reference_projects`** opcional, **structlog** en el loader.
 
-## 7.2 Contexto de proyectos similares
+## Implementado
 
-```python
-class ReferenceProject(BaseModel):
-    name: str
-    description: str
-    estimated_weeks: int | None = None
+### 7.1 Versionado real (`prompt_version=v2`)
 
-class EstimationRequest(BaseModel):
-    ...
-    reference_projects: list[ReferenceProject] | None = None
-```
+- [x] Carpeta `app/prompts/estimation/v2/` (tono `BONUS_V2_PROFILE`, ejemplos `V2_CALIBRATION_SET`).
+- [x] `POST /api/v1/estimate?prompt_version=v1|v2` y el mismo parámetro en `/estimate/stream`.
+- [x] `EstimationResponse.prompt_version` refleja la versión usada.
+- [x] Tests: v2 ≠ v1; 422 si versión no soportada.
 
-- En `system.j2` o `user.j2`:
+### 7.2 Contexto de proyectos similares
 
-```jinja2
-{% if reference_projects %}
-{% for ref in reference_projects %}
-...
-{% endfor %}
-{% endif %}
-```
+- [x] `ReferenceProject` + `reference_projects` opcional (máx. 10) en `EstimationRequest`.
+- [x] Bloque `<reference_projects>` en `system.j2` (v1 y v2).
+- [x] Tests: nombre presente cuando hay lista; bloque ausente sin lista.
+- [x] Streamlit: expander con JSON opcional.
 
-- Tests: con lista presente el render incluye un nombre de proyecto; sin lista, bloque ausente.
+### 7.3 Logging del prompt renderizado
 
-## 7.3 Logging del prompt renderizado
-
-- Añadir `structlog` al loader
-- En cada `render_estimation_prompt`, emitir evento con `version` y hash SHA256 de `system+user`
-- Configurar según `APP_ENV` en `config.py`
+- [x] Dependencia `structlog`.
+- [x] Evento `prompt_rendered` con `prompt_template_version`, `app_env`, `content_sha256`, `description_chars`.
+- [x] Configuración en `lifespan` de `app/main.py` según `APP_ENV` (consola en development, JSON en otro).
+- [x] Test con `structlog.testing.capture_logs`.
 
 ## Verificación bonus
 
-- [ ] Tests nuevos para la extensión elegida
-- [ ] `pytest` sigue en verde
-- [ ] README menciona la feature
+```bash
+uv run pytest -q
+```
 
-## Antes de cerrar
-
-No es obligatorio para la sesión base. Confirma si implementamos algún bonus o cerramos en Paso 6.
+- [x] Tests nuevos pasan junto a la suite existente.

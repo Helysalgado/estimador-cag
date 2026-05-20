@@ -7,10 +7,13 @@ call site (``version="v2"``), not a code refactor.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
+import structlog
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from app.config import settings
 from app.schemas.estimation import EstimationRequest
 
 _BASE_DIR = Path(__file__).resolve().parent
@@ -23,6 +26,8 @@ _env = Environment(
     autoescape=False,
     keep_trailing_newline=True,
 )
+
+log = structlog.get_logger(__name__)
 
 
 def render_estimation_prompt(
@@ -40,7 +45,17 @@ def render_estimation_prompt(
         "project_type": request.project_type.value,
         "detail_level": request.detail_level.value,
         "output_format": request.output_format.value,
+        "reference_projects": request.reference_projects,
     }
     system = _env.get_template(f"estimation/{version}/system.j2").render(**context)
     user = _env.get_template(f"estimation/{version}/user.j2").render(**context)
+    combined = (system + user).encode("utf-8")
+    content_sha256 = hashlib.sha256(combined).hexdigest()
+    log.info(
+        "prompt_rendered",
+        prompt_template_version=version,
+        app_env=settings.APP_ENV,
+        content_sha256=content_sha256,
+        description_chars=len(request.description),
+    )
     return system, user

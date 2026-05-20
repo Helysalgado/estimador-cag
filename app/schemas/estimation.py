@@ -28,6 +28,19 @@ class OutputFormat(str, Enum):
     NARRATIVE = "narrative"
 
 
+class ReferenceProject(BaseModel):
+    """Optional similar project the model may use as loose scope context."""
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=2000)
+    estimated_weeks: int | None = Field(
+        default=None,
+        ge=1,
+        le=520,
+        description="Optional indicative duration of the reference project in weeks.",
+    )
+
+
 class EstimationRequest(BaseModel):
     """Typed payload sent by the business backend or Streamlit form."""
 
@@ -39,6 +52,11 @@ class EstimationRequest(BaseModel):
     project_type: ProjectType = Field(description="Coarse-grained project category.")
     detail_level: DetailLevel = Field(description="How deep the estimation should go.")
     output_format: OutputFormat = Field(description="Shape of the rendered estimation.")
+    reference_projects: list[ReferenceProject] | None = Field(
+        default=None,
+        max_length=10,
+        description="Optional list of similar projects for the prompt context block.",
+    )
 
 
 class EstimationResponse(BaseModel):

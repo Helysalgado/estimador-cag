@@ -24,8 +24,9 @@ class FakeEstimateFromRequest:
         self.calls: list[dict[str, Any]] = []
 
     def __call__(self, request, **kwargs: Any) -> EstimationResponse:  # noqa: ANN001
+        pv = kwargs.get("prompt_version", "v1")
         self.calls.append({"request": request, **kwargs})
-        return EstimationResponse(text=self.response_text, prompt_version="v1")
+        return EstimationResponse(text=self.response_text, prompt_version=pv)
 
 
 @pytest.fixture
@@ -36,6 +37,21 @@ def fake_estimate(monkeypatch):
         fake,
     )
     return fake
+
+
+def test_prompt_version_query_v2_passes_through(client, fake_estimate) -> None:
+    response = client.post("/api/v1/estimate?prompt_version=v2", json=VALID_PAYLOAD)
+    assert response.status_code == 200
+    assert fake_estimate.calls[0]["prompt_version"] == "v2"
+    assert response.json()["prompt_version"] == "v2"
+
+
+def test_invalid_prompt_version_returns_422(client, fake_estimate) -> None:
+    response = client.post("/api/v1/estimate?prompt_version=v999", json=VALID_PAYLOAD)
+    assert response.status_code == 422
+    body = response.json()
+    assert body["detail"]["error"] == "unsupported_prompt_version"
+    assert "v1" in body["detail"]["allowed"]
 
 
 def test_valid_payload_returns_text_and_prompt_version(client, fake_estimate) -> None:

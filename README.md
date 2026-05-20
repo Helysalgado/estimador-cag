@@ -77,7 +77,43 @@ Respuesta:
 }
 ```
 
-### Streaming SSE (opcional)
+### Versión de plantilla (`v1` / `v2`)
+
+Por defecto se usa `v1`. Para la variante **v2** (tono más directo y ejemplos distintos):
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/estimate?prompt_version=v2" \
+  -H "Content-Type: application/json" \
+  -d '{ ... mismo body que arriba ... }'
+```
+
+`prompt_version` inválido (p. ej. `v999`) devuelve **422** con `allowed: ["v1","v2"]`. El streaming `POST /api/v1/estimate/stream` acepta el mismo query param.
+
+### Proyectos de referencia (opcional)
+
+Puedes enviar hasta **10** proyectos similares; aparecen en el bloque `<reference_projects>` del system prompt:
+
+```json
+{
+  "description": "…mínimo 20 caracteres…",
+  "project_type": "web_saas",
+  "detail_level": "medium",
+  "output_format": "phases_table",
+  "reference_projects": [
+    {
+      "name": "Loan tracker v0",
+      "description": "Internal pilot for equipment checkout with LDAP.",
+      "estimated_weeks": 10
+    }
+  ]
+}
+```
+
+### Logging de prompts (structlog)
+
+Al renderizar prompts, el loader emite el evento **`prompt_rendered`** con `prompt_template_version`, `app_env`, `content_sha256` (hash SHA-256 del system+user) y longitud de la descripción. La configuración de **structlog** se aplica al arrancar la app (`lifespan` en `app/main.py`).
+
+## Cómo testar
 
 `POST /api/v1/estimate/stream` usa el mismo body y emite eventos `status`, `token`, `complete` o `error`.
 
@@ -106,7 +142,7 @@ La suite corre en milisegundos sin APIs externas:
 | Archivo | Qué cubre |
 |---------|-----------|
 | `tests/test_schemas.py` | Validación de `EstimationRequest` |
-| `tests/test_prompts.py` | Render Jinja2 (condicionales, `<project_description>`, ejemplos) |
+| `tests/test_prompts.py` | Plantillas Jinja2, `v1`/`v2`, referencias, structlog |
 | `tests/test_estimate_endpoint.py` | Contrato HTTP 200/422, system/user separados |
 | `tests/test_estimate_stream_endpoint.py` | SSE con payload tipado |
 | `tests/test_estimate_service_cache.py` | Cache Redis en `estimate_from_request` |
@@ -171,6 +207,15 @@ El contrato Pydantic y el router no deberían cambiar solo por una nueva versió
 | `CACHE_TTL_SECONDS` | `86400` | TTL en segundos (24 h) |
 | `ESTIMATOR_API_BASE_URL` | `http://localhost:8000` | URL que usa Streamlit |
 | `APP_ENV` | `development` | Entorno |
+
+### Si Streamlit muestra 502 (`Upstream LLM call failed`)
+
+Ese mensaje viene del API cuando **LiteLLM no pudo completar la llamada** (no es un fallo del formulario). Revisa en orden:
+
+1. **Claves en `.env`** en la **misma carpeta** desde la que arrancas `uvicorn`: `OPENAI_API_KEY` y/o `ANTHROPIC_API_KEY`. Tras editar `.env`, **reinicia** el servidor (el singleton de settings no recarga solo).
+2. **`LLM_PROVIDER` y `LLM_MODEL`**: si `LLM_PROVIDER=openai`, hace falta clave de OpenAI; si usas Anthropic como primario, la clave correspondiente.
+3. **Streamlit y API en distintos puertos**: en `.env` o al lanzar Streamlit, `ESTIMATOR_API_BASE_URL` debe ser la URL **real** del API (p. ej. `http://127.0.0.1:8010` si el API no está en 8000).
+4. Con **`APP_ENV=development`**, el cuerpo del 502 incluye ahora `error_type`, `error` (mensaje truncado) y una **pista** en JSON; la UI de Streamlit muestra ese JSON formateado para facilitar el diagnóstico. En la terminal del API verás el log **`estimation_llm_failed`** con el stack.
 
 ## Docker
 

@@ -7,6 +7,7 @@ The endpoint URL is read from ``ESTIMATOR_API_BASE_URL`` (loaded from ``.env``).
 
 from __future__ import annotations
 
+import json
 import os
 
 import httpx
@@ -18,7 +19,7 @@ from app.schemas.estimation import DetailLevel, OutputFormat, ProjectType
 load_dotenv()
 
 API_BASE_URL = os.getenv("ESTIMATOR_API_BASE_URL", "http://localhost:8000")
-ESTIMATE_ENDPOINT = f"{API_BASE_URL.rstrip('/')}/api/v1/estimate"
+ESTIMATE_PATH = f"{API_BASE_URL.rstrip('/')}/api/v1/estimate"
 
 st.set_page_config(page_title="Estimador de software", page_icon="📊")
 st.title("Estimador de software")
@@ -53,6 +54,20 @@ with st.form("estimation_form", clear_on_submit=False):
         index=0,
         format_func=lambda v: v.replace("_", " ").title(),
     )
+    prompt_version = st.selectbox(
+        "Versión del prompt (plantilla Jinja)",
+        options=["v1", "v2"],
+        index=0,
+        help="v2 usa un tono más directo y ejemplos de calibración distintos.",
+    )
+    with st.expander("Proyectos de referencia (opcional)", expanded=False):
+        reference_json = st.text_area(
+            "JSON: lista de objetos con name, description y opcional estimated_weeks",
+            value="[]",
+            height=120,
+            placeholder='[{"name": "Similar app", "description": "...", "estimated_weeks": 12}]',
+            label_visibility="visible",
+        )
     submitted = st.form_submit_button("Generar estimación", type="primary")
 
 if submitted:
@@ -65,30 +80,50 @@ if submitted:
             "detail_level": detail_level,
             "output_format": output_format,
         }
-        with st.spinner("Llamando al servicio de estimación…"):
+        refs_ok = True
+        ref_raw = reference_json.strip()
+        if ref_raw and ref_raw != "[]":
             try:
-                response = httpx.post(
-                    ESTIMATE_ENDPOINT,
-                    json=payload,
-                    timeout=httpx.Timeout(120.0, connect=10.0),
-                )
-                response.raise_for_status()
-                body = response.json()
-            except httpx.HTTPStatusError as exc:
-                st.error(
-                    f"El servicio respondió {exc.response.status_code}: {exc.response.text}"
-                )
-            except httpx.HTTPError as exc:
-                st.error(
-                    f"No se pudo conectar con el estimador en `{ESTIMATE_ENDPOINT}`: {exc}"
-                )
-            else:
-                st.markdown(f"**Versión del prompt:** `{body.get('prompt_version', '?')}`")
-                st.markdown(body.get("text", ""))
+                parsed = json.loads(ref_raw)
+                if not isinstance(parsed, list):
+                    raise ValueError("Debe ser una lista JSON")
+                payload["reference_projects"] = parsed
+            except (json.JSONDecodeError, ValueError) as exc:
+                st.error(f"JSON de referencias inválido: {exc}")
+                refs_ok = False
+        if refs_ok:
+            with st.spinner("Llamando al servicio de estimación…"):
+                try:
+                    response = httpx.post(
+                        ESTIMATE_PATH,
+                        params={"prompt_version": prompt_version},
+                        json=payload,
+                        timeout=httpx.Timeout(120.0, connect=10.0),
+                    )
+                    response.raise_for_status()
+                    body = response.json()
+                except httpx.HTTPStatusError as exc:
+                    detail = exc.response.text
+                    try:
+                        parsed = exc.response.json()
+                        if isinstance(parsed, dict):
+                            detail = json.dumps(parsed, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                    st.error(
+                        f"El servicio respondió {exc.response.status_code}:\n\n```\n{detail}\n```"
+                    )
+                except httpx.HTTPError as exc:
+                    st.error(
+                        f"No se pudo conectar con el estimador en `{ESTIMATE_PATH}`: {exc}"
+                    )
+                else:
+                    st.markdown(f"**Versión del prompt:** `{body.get('prompt_version', '?')}`")
+                    st.markdown(body.get("text", ""))
 
 with st.sidebar:
     st.header("Servicio")
-    st.code(ESTIMATE_ENDPOINT, language="text")
+    st.code(ESTIMATE_PATH, language="text")
     st.markdown(f"**Proveedor (API):** `{os.getenv('LLM_PROVIDER', 'openai')}`")
     st.markdown(f"**Modelo (API):** `{os.getenv('LLM_MODEL', 'gpt-4o-mini')}`")
     st.markdown(f"**TTL cache:** `{os.getenv('CACHE_TTL_SECONDS', '86400')}s`")
