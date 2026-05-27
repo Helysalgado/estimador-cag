@@ -87,6 +87,14 @@ def format_attachment_block(filename: str, text: str) -> str:
     return f"--- attachment: {filename} ---\n{body}"
 
 
+def truncate_attachment_text(text: str, *, max_chars: int | None = None) -> str:
+    """Clamp extracted text to configured char budget."""
+    max_chars = max_chars if max_chars is not None else settings.MAX_ATTACHMENT_CHARS
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars]
+
+
 def build_user_turn(transcript: str, attachments_text: str) -> str:
     """Combine the user transcript with optional attachment blocks."""
     transcript = transcript.strip()
@@ -135,6 +143,6 @@ async def process_attachments(
             text = extract_text_from_pdf(data)
         else:
             text = extract_text_from_docx(data)
-        blocks.append(format_attachment_block(filename, text))
+        blocks.append(format_attachment_block(filename, truncate_attachment_text(text)))
 
     return "\n\n".join(blocks)

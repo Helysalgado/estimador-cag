@@ -42,6 +42,10 @@ def test_generate_sync_messages_accepts_multi_turn_list(monkeypatch):
     result = generate_sync_messages(messages=messages, config=WrapperConfig(provider="openai", model="gpt-4o-mini"))
     assert captured["messages"] == messages
     assert result["estimation"] == "Multi-turn reply"
+    assert "latency_ms" in result
+    assert "tokens_in" in result
+    assert "tokens_out" in result
+    assert "cost_usd" in result
 
 
 def test_generate_sync_uses_fallback_on_recoverable_error(monkeypatch):
@@ -70,6 +74,7 @@ def test_generate_sync_uses_fallback_on_recoverable_error(monkeypatch):
     assert result["provider"] == "anthropic"
     assert "fallback" in result["estimation"].lower()
     assert result["meta"]["fallback_used"] is True
+    assert isinstance(result["cost_usd"], float)
 
 
 class _AsyncStream:

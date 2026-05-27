@@ -1,13 +1,16 @@
 """Multi-turn session estimation: LLM orchestration and metadata heuristics."""
 
 from __future__ import annotations
-
 import re
 
 import structlog
 
 from app.prompts.loader import render_session_system_prompt
-from app.schemas.sessions import ProjectMetadataView, SessionEstimationResponse
+from app.schemas.sessions import ACBIterationView, ACBResponse, ProjectMetadataView, SessionEstimationResponse
+from app.sessions.metadata_extractor import extract_project_metadata_update, merge_metadata
+from app.sessions.tier_resolver import resolve_tier
+from app.services.boss import boss_decide
+from app.services.critic import critic_review
 from app.services.llm_wrapper import WrapperConfig, generate_sync_messages, get_default_wrapper_config
 from app.services.sessions import ProjectMetadata, Session
 
@@ -116,12 +119,25 @@ def estimate_session_turn(
     user_turn: str,
     *,
     prompt_version: str = PROMPT_VERSION,
+    tier_override: str | None = None,
+    attachments_total_chars: int = 0,
+    cache_hit_kind: str = "none",
     config: WrapperConfig | None = None,
 ) -> SessionEstimationResponse:
     """Run one conversational turn: LLM call, history update, metadata refresh."""
     config = config or get_default_wrapper_config()
+    tier, rule = resolve_tier(
+        user_turn=user_turn,
+        metadata=session.metadata,
+        tier_override=tier_override,
+    )
+    session.last_resolved_tier = tier
+    session.last_tier_rule = rule
     system_prompt = render_session_system_prompt(
         project_metadata=session.metadata,
+        rolling_summary=session.rolling_summary,
+        anchors=[anchor.text for anchor in session.anchors[-8:]],
+        tier=tier,
         version=prompt_version,
     )
     messages = session.history.build_messages(
@@ -131,8 +147,14 @@ def estimate_session_turn(
     result = generate_sync_messages(messages=messages, config=config)
     assistant_text = result.get("estimation") or ""
 
-    session.history.add_turn(user_turn, assistant_text)
+    session.add_turn(user_turn, assistant_text)
     update_metadata_from_turn(session.metadata, user_turn, assistant_text)
+    llm_metadata = extract_project_metadata_update(
+        user_turn=user_turn,
+        assistant_text=assistant_text,
+        config=config,
+    )
+    merge_metadata(session.metadata, llm_metadata)
 
     log.info(
         "session_turn_completed",
@@ -141,9 +163,68 @@ def estimate_session_turn(
         history_turns=session.history.turn_count,
         metadata_populated=session.metadata.has_content(),
     )
+    turn_observed = {
+        "turn_index": session.history.turn_count,
+        "session_id": session.session_id,
+        "enriched_transcript_chars": len(user_turn),
+        "attachments_total_chars": attachments_total_chars,
+        "messages_in_window": len(session.history._messages),  # noqa: SLF001
+        "anchors_count": len(session.anchors),
+        "summary_chars": len(session.rolling_summary),
+        "tokens_in": result.get("tokens_in"),
+        "tokens_out": result.get("tokens_out"),
+        "cost_usd": result.get("cost_usd", 0.0),
+        "latency_ms": result.get("latency_ms"),
+        "cache_hit_kind": cache_hit_kind,
+        "last_resolved_tier": session.last_resolved_tier,
+    }
+    session.last_turn_observed = turn_observed
+    log.info("turn_observed", **turn_observed)
+
     return SessionEstimationResponse(
         text=assistant_text,
         prompt_version=prompt_version,
         turn_count=session.history.turn_count,
+        tier=tier,
+        tier_rule=rule,
         project_metadata=ProjectMetadataView.model_validate(session.metadata),
+    )
+
+
+def estimate_session_turn_acb(
+    session: Session,
+    user_turn: str,
+    *,
+    prompt_version: str = PROMPT_VERSION,
+    tier_override: str | None = None,
+    config: WrapperConfig | None = None,
+    max_iterations: int = 2,
+) -> ACBResponse:
+    """Run optional Actor-Critic-Boss loop and return trace."""
+    _ = config or get_default_wrapper_config()
+    trace: list[ACBIterationView] = []
+    actor = estimate_session_turn(
+        session,
+        user_turn,
+        prompt_version=prompt_version,
+        tier_override=tier_override,
+        config=config,
+    )
+    candidate_text = actor.text
+    for iteration in range(1, max_iterations + 1):
+        critic = critic_review(user_turn=user_turn, candidate_text=candidate_text)
+        verdict, note = boss_decide(critic=critic, iteration=iteration)
+        trace.append(ACBIterationView(iteration=iteration, verdict=verdict, notes=note))
+        if verdict == "accept":
+            break
+        # Keep first actor response as persisted truth in this simplified ACB.
+        candidate_text = actor.text
+    return ACBResponse(
+        text=candidate_text,
+        prompt_version=prompt_version,
+        turn_count=session.history.turn_count,
+        tier=session.last_resolved_tier,
+        tier_rule=session.last_tier_rule,
+        project_metadata=ProjectMetadataView.model_validate(session.metadata),
+        trace=trace,
     )

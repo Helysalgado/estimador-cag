@@ -58,6 +58,9 @@ def render_estimation_prompt(
         "output_format": request.output_format.value,
         "reference_projects": request.reference_projects,
         "project_metadata": _project_metadata_for_template(project_metadata),
+        "rolling_summary": None,
+        "anchors": [],
+        "tier": "default",
     }
     system = _env.get_template(f"estimation/{version}/system.j2").render(**context)
     user = _env.get_template(f"estimation/{version}/user.j2").render(**context)
@@ -76,6 +79,9 @@ def render_estimation_prompt(
 def render_session_system_prompt(
     *,
     project_metadata: ProjectMetadata | None,
+    rolling_summary: str | None = None,
+    anchors: list[str] | None = None,
+    tier: str = "default",
     version: str = "v1",
     project_type: str = "web_saas",
     detail_level: str = "medium",
@@ -92,5 +98,8 @@ def render_session_system_prompt(
         "output_format": output_format,
         "reference_projects": None,
         "project_metadata": _project_metadata_for_template(project_metadata),
+        "rolling_summary": rolling_summary,
+        "anchors": anchors or [],
+        "tier": tier,
     }
     return _env.get_template(f"estimation/{version}/system.j2").render(**context)

@@ -41,7 +41,13 @@ def test_estimate_session_turn_updates_history_and_metadata(monkeypatch):
         assert messages[0]["role"] == "system"
         assert messages[-1]["role"] == "user"
         assert messages[-1]["content"].startswith("Turn one about FastAPI")
-        return {"estimation": "Turn one estimation with React noted."}
+        return {
+            "estimation": "Turn one estimation with React noted.",
+            "tokens_in": 120,
+            "tokens_out": 80,
+            "cost_usd": 0.0025,
+            "latency_ms": 340,
+        }
 
     monkeypatch.setattr(
         "app.services.session_estimation.generate_sync_messages",
@@ -63,6 +69,22 @@ def test_estimate_session_turn_updates_history_and_metadata(monkeypatch):
     assert session.history.turn_count == 1
     assert "React" in session.metadata.mentioned_technologies
     assert session.metadata.assumed_team_size == 3
+    assert session.last_turn_observed is not None
+    assert set(session.last_turn_observed.keys()) == {
+        "turn_index",
+        "session_id",
+        "enriched_transcript_chars",
+        "attachments_total_chars",
+        "messages_in_window",
+        "anchors_count",
+        "summary_chars",
+        "tokens_in",
+        "tokens_out",
+        "cost_usd",
+        "latency_ms",
+        "cache_hit_kind",
+        "last_resolved_tier",
+    }
 
 
 def test_second_turn_includes_prior_history_in_messages(monkeypatch):

@@ -111,7 +111,8 @@ curl -X POST http://localhost:8000/api/v1/estimate \
 ```text
 1. POST /api/v1/sessions              →  { "session_id": "<uuid>" }
 2. POST /api/v1/sessions/{id}/estimate (multipart, un turno)
-3. Repetir el paso 2 en la misma sesión para seguir la conversación
+3. GET  /api/v1/sessions/{id}          (debug de memoria/tier)
+4. (Opcional) POST /api/v1/sessions/{id}/estimate-acb
 ```
 
 La sesión guarda en memoria:
@@ -154,6 +155,7 @@ Campos del formulario:
 | `transcript` | form field | Sí | Mensaje del usuario en este turno |
 | `attachments` | file(s) | No | PDF o DOCX (hasta `MAX_ATTACHMENTS_PER_REQUEST`) |
 | `prompt_version` | query | No | `v1` (default) o `v2` |
+| `tier` | query | No | Override opcional: `default`, `executive`, `pm`, `developer` |
 
 **Solo texto:**
 
@@ -179,6 +181,8 @@ Respuesta de un turno:
   "text": "…estimación del LLM…",
   "prompt_version": "v1",
   "turn_count": 2,
+  "tier": "pm",
+  "tier_rule": "small_team_pm",
   "project_metadata": {
     "project_name": "InventoryHub",
     "assumed_team_size": 4,
@@ -188,6 +192,31 @@ Respuesta de un turno:
     "rejected_options": []
   }
 }
+```
+
+Debug de sesión:
+
+```bash
+curl -s "http://localhost:8000/api/v1/sessions/${SESSION_ID}"
+```
+
+Respuesta (campos principales):
+
+```json
+{
+  "message_count": 6,
+  "anchors_count": 3,
+  "summary_chars": 840,
+  "last_resolved_tier": "pm",
+  "last_tier_rule": "small_team_pm"
+}
+```
+
+Modo ACB opcional:
+
+```bash
+curl -s -X POST "http://localhost:8000/api/v1/sessions/${SESSION_ID}/estimate-acb" \
+  -F 'transcript=Refine estimate with stronger risk mitigation'
 ```
 
 El endpoint **stateless** `POST /api/v1/estimate` sigue disponible y no comparte memoria con las sesiones.
@@ -247,6 +276,7 @@ La metadata se inyecta en el **system prompt** dentro de `<project_metadata>` (s
 | **Cache Redis** | Solo aplica al modo formulario (`/estimate`), no a turnos de sesión. |
 | **Adjuntos** | PDF/DOCX con texto extraíble; escaneos imagen necesitarían OCR (fuera de alcance). |
 | **Metadata** | Heurística básica; puede omitir o sobrescribir datos si el lenguaje es ambiguo. |
+| **ACB** | Implementación inicial opcional; la iteración avanzada Actor-Critic-Boss sigue siendo simplificada. |
 
 Para producción haría falta Redis/PostgreSQL para sesiones, política de TTL y, si aplica, extracción más robusta de documentos.
 
@@ -285,6 +315,30 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_estimate_*.py` | Estimate stateless y cache |
 | `tests/test_llm_wrapper.py` | LiteLLM, mensajes multi-turno |
 | `tests/test_health.py` | Health check |
+
+### Evals (Session 06 parity)
+
+Dataset golden y runner CLI:
+
+```bash
+uv run python evals/run.py --mode actor
+uv run python evals/run.py --mode acb
+```
+
+Incluye 16 casos en `evals/golden_dataset.json` y 3 métricas binarias:
+- `SchemaAdherenceMetric`
+- `CostBoundsMetric`
+- `ContentRecallMetric`
+
+Stress runner (escenarios multi-turno + adjuntos + CSV):
+
+```bash
+uv run python -m evals.stress.run --http http://127.0.0.1:8000 --output evals/stress/results.csv
+```
+
+Artefactos generados:
+- `evals/stress/results.csv`
+- `evals/stress/REPORT.md`
 
 ```bash
 uv run python scripts/validate_structure.py
@@ -338,6 +392,12 @@ Plantillas en `app/prompts/estimation/<version>/`. Para una nueva versión: copi
 | `REDIS_URL` | `redis://localhost:6379/0` | Cache modo formulario |
 | `CACHE_TTL_SECONDS` | `86400` | TTL cache (24 h) |
 | `SESSION_MAX_TURNS` | `6` | Ventana de historial en sesiones |
+| `MAX_CONVERSATION_TURNS` | `6` | Alias compatible Session 06 para ventana |
+| `MAX_SUMMARY_CHARS` | `4000` | Tamaño máximo del summary acumulativo |
+| `MAX_ANCHORS` | `20` | Máximo anchors heurísticos persistidos |
+| `METADATA_EXTRACTOR_MODEL` | `gpt-4o-mini` | Modelo barato de extractor metadata |
+| `ENABLE_ACB` | `true` | Habilita endpoint `/estimate-acb` |
+| `ACB_MAX_ITERATIONS` | `2` | Iteraciones máximas de lazo ACB |
 | `MAX_ATTACHMENT_BYTES` | `5000000` | Límite por adjunto |
 | `MAX_ATTACHMENTS_PER_REQUEST` | `5` | Adjuntos por turno |
 | `ESTIMATOR_API_BASE_URL` | `http://localhost:8000` | Cliente Streamlit |

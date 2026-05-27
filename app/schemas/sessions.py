@@ -11,6 +11,12 @@ class SessionCreateResponse(BaseModel):
     )
 
 
+class AnchorView(BaseModel):
+    text: str
+    source_turn: int
+    confidence: float
+
+
 class ProjectMetadataView(BaseModel):
     """Snapshot of stable project facts accumulated during a session."""
 
@@ -30,4 +36,35 @@ class SessionEstimationResponse(BaseModel):
     text: str = Field(description="Estimation rendered by the LLM as free text.")
     prompt_version: str = Field(description="Jinja template version used for this turn.")
     turn_count: int = Field(ge=0, description="Completed user/assistant pairs in memory.")
+    tier: str = Field(default="default", description="Tier resolved for this response.")
+    tier_rule: str = Field(default="default_rule", description="Rule used to resolve tier.")
     project_metadata: ProjectMetadataView
+
+
+class SessionDebugResponse(BaseModel):
+    session_id: str
+    message_count: int = Field(ge=0)
+    anchors_count: int = Field(ge=0)
+    summary_chars: int = Field(ge=0)
+    last_resolved_tier: str
+    last_tier_rule: str
+    project_metadata: ProjectMetadataView
+    anchors: list[AnchorView] = Field(default_factory=list)
+    rolling_summary: str = ""
+    last_turn_observed: dict[str, object] | None = None
+
+
+class ACBIterationView(BaseModel):
+    iteration: int
+    verdict: str
+    notes: str
+
+
+class ACBResponse(BaseModel):
+    text: str
+    prompt_version: str
+    turn_count: int
+    tier: str
+    tier_rule: str
+    project_metadata: ProjectMetadataView
+    trace: list[ACBIterationView] = Field(default_factory=list)

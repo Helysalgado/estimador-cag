@@ -21,3 +21,21 @@ The following items are stable facts from the ongoing conversation. Treat them a
 {% endif %}
 </project_metadata>
 {% endif %}
+
+{% if rolling_summary %}
+<rolling_summary>
+{{ rolling_summary }}
+</rolling_summary>
+{% endif %}
+
+{% if anchors %}
+<anchors>
+{% for anchor in anchors %}
+- {{ anchor }}
+{% endfor %}
+</anchors>
+{% endif %}
+
+<tier>
+{{ tier | default("default") }}
+</tier>

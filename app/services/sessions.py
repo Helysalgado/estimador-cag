@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from app.config import settings
+from app.sessions.compression.policy import compress_evicted_pairs
 
 MessageRole = Literal["user", "assistant"]
 
@@ -23,6 +24,15 @@ class Message:
 
     role: MessageRole
     content: str
+
+
+@dataclass
+class Anchor:
+    """Stable conversational fact promoted from older turns."""
+
+    text: str
+    source_turn: int
+    confidence: float = 0.5
 
 
 @dataclass
@@ -52,8 +62,10 @@ class ConversationHistory:
     """Rolling user/assistant pairs with a sliding window over completed turns."""
 
     def __init__(self, *, max_turns: int | None = None) -> None:
-        self._max_turns = max_turns if max_turns is not None else settings.SESSION_MAX_TURNS
+        configured_turns = settings.MAX_CONVERSATION_TURNS or settings.SESSION_MAX_TURNS
+        self._max_turns = max_turns if max_turns is not None else configured_turns
         self._messages: list[Message] = []
+        self._last_evicted_pairs: list[tuple[Message, Message]] = []
 
     @property
     def turn_count(self) -> int:
@@ -65,6 +77,12 @@ class ConversationHistory:
         self._messages.append(Message(role="user", content=user_content))
         self._messages.append(Message(role="assistant", content=assistant_content))
         self._trim()
+
+    def consume_evicted_pairs(self) -> list[tuple[Message, Message]]:
+        """Return and clear pairs evicted by the latest trim."""
+        evicted = self._last_evicted_pairs
+        self._last_evicted_pairs = []
+        return evicted
 
     def build_messages(
         self,
@@ -90,7 +108,14 @@ class ConversationHistory:
     def _trim(self) -> None:
         max_messages = self._max_turns * 2
         if len(self._messages) > max_messages:
-            self._messages = self._messages[-max_messages:]
+            overflow = len(self._messages) - max_messages
+            evicted = self._messages[:overflow]
+            self._messages = self._messages[overflow:]
+            self._last_evicted_pairs.extend(
+                (evicted[index], evicted[index + 1])
+                for index in range(0, len(evicted), 2)
+                if index + 1 < len(evicted)
+            )
 
 
 @dataclass
@@ -100,9 +125,32 @@ class Session:
     session_id: str
     history: ConversationHistory = field(default_factory=ConversationHistory)
     metadata: ProjectMetadata = field(default_factory=ProjectMetadata)
+    anchors: list[Anchor] = field(default_factory=list)
+    rolling_summary: str = ""
+    last_resolved_tier: str = "default"
+    last_tier_rule: str = "default_rule"
+    last_turn_observed: dict[str, object] | None = None
     created_at: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc),
     )
+
+    def add_turn(self, user_content: str, assistant_content: str) -> None:
+        """Append a turn and run compression on evicted history."""
+        self.history.add_turn(user_content, assistant_content)
+        evicted_pairs = self.history.consume_evicted_pairs()
+        if not evicted_pairs:
+            return
+        summary, new_anchors = compress_evicted_pairs(
+            evicted_pairs,
+            current_summary=self.rolling_summary,
+            max_summary_chars=settings.MAX_SUMMARY_CHARS,
+            max_anchors=settings.MAX_ANCHORS,
+            current_turn=self.history.turn_count,
+        )
+        self.rolling_summary = summary
+        self.anchors.extend(Anchor(**anchor) for anchor in new_anchors)
+        if len(self.anchors) > settings.MAX_ANCHORS:
+            self.anchors = self.anchors[-settings.MAX_ANCHORS :]
 
 
 class SessionStore:

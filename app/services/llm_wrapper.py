@@ -15,6 +15,10 @@ DEFAULT_MODELS = {
     "openai": "gpt-4o-mini",
     "anthropic": "claude-haiku-4-5-20251001",
 }
+MODEL_COSTS: dict[str, tuple[float, float]] = {
+    "gpt-4o-mini": (0.15, 0.60),
+    "claude-haiku-4-5-20251001": (0.25, 1.25),
+}
 
 
 @dataclass
@@ -57,6 +61,14 @@ def _base_messages(system_prompt: str, user_message: str) -> list[dict[str, str]
     ]
 
 
+def _estimate_cost_usd(model: str, tokens_in: int | None, tokens_out: int | None) -> float:
+    in_cost, out_cost = MODEL_COSTS.get(model, (0.0, 0.0))
+    tin = tokens_in or 0
+    tout = tokens_out or 0
+    usd = (tin / 1_000_000) * in_cost + (tout / 1_000_000) * out_cost
+    return round(usd, 6)
+
+
 def generate_sync_messages(
     *,
     messages: list[dict[str, str]],
@@ -85,15 +97,22 @@ def generate_sync_messages(
             )
             text = response.choices[0].message.content if response.choices else ""
             usage = getattr(response, "usage", None)
+            tokens_in = getattr(usage, "prompt_tokens", None)
+            tokens_out = getattr(usage, "completion_tokens", None)
+            latency_ms = int((time.perf_counter() - started) * 1000)
             return {
                 "estimation": text or "",
                 "model": model,
                 "provider": provider,
+                "latency_ms": latency_ms,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "cost_usd": _estimate_cost_usd(model, tokens_in, tokens_out),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "meta": {
-                    "input_tokens": getattr(usage, "prompt_tokens", None),
-                    "output_tokens": getattr(usage, "completion_tokens", None),
-                    "response_time_s": round(time.perf_counter() - started, 2),
+                    "input_tokens": tokens_in,
+                    "output_tokens": tokens_out,
+                    "response_time_s": round(latency_ms / 1000, 2),
                     "fallback_used": fallback_used,
                     "fallback_reason": fallback_reason,
                 },
@@ -204,6 +223,10 @@ async def stream_events(
                     "provider": provider,
                     "model": model,
                     "response_time_s": round(time.perf_counter() - started, 2),
+                    "latency_ms": int((time.perf_counter() - started) * 1000),
+                    "tokens_in": None,
+                    "tokens_out": None,
+                    "cost_usd": 0.0,
                     "fallback_used": fallback_used,
                     "fallback_reason": fallback_reason,
                 },
