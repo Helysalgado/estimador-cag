@@ -5,6 +5,7 @@ import structlog
 from fastapi import FastAPI
 
 from app.config import settings
+from app.embedding_pipeline import router as embeddings_router
 from app.routers import estimations, sessions
 
 
@@ -47,6 +48,7 @@ app = FastAPI(
 
 app.include_router(estimations.router)
 app.include_router(sessions.router)
+app.include_router(embeddings_router.router)
 
 
 # -------------------------
