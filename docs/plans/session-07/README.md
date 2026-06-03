@@ -6,6 +6,7 @@ Pre-ejercicio: **pipeline mínimo de embeddings y chunking** sobre presupuestos 
 |-----------|-----------|
 | **[PLAN-IMPLEMENTACION.md](./PLAN-IMPLEMENTACION.md)** | Plan detallado por fases (material `mat-sesion7.md`) |
 | **[GAP-ANALISIS.md](./GAP-ANALISIS.md)** | Cumplimiento vs material y brechas pendientes |
+| **[Sesión en vivo →](../session-07-live/README.md)** | Plan rama `session-07-live` (TopicSegmentation, ingest multi-tipo) |
 | Material de curso | `IAENG/material/mat-sesion7.md` |
 
 ## Rama de trabajo

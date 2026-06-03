@@ -16,9 +16,10 @@
   - **[`plans/session-06/PLAN-IMPLEMENTACION.md`](./plans/session-06/PLAN-IMPLEMENTACION.md)** — qué falta implementar (vs LIDR S6)
 
 - Sesión 7 (embeddings + chunking estructural):
-  - **[`plans/session-07/`](./plans/session-07/README.md)** — índice
+  - **[`plans/session-07/`](./plans/session-07/README.md)** — índice pre-ejercicio
   - **[`plans/session-07/PLAN-IMPLEMENTACION.md`](./plans/session-07/PLAN-IMPLEMENTACION.md)** — plan detallado (material `mat-sesion7.md`)
   - **[`plans/session-07/GAP-ANALISIS.md`](./plans/session-07/GAP-ANALISIS.md)** — cumplimiento vs material
+  - **[`plans/session-07-live/`](./plans/session-07-live/README.md)** — plan sesión en vivo (rama `session-07-live`)
 
 ## Texto de entrada de ejemplo
 
