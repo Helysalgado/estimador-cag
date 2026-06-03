@@ -49,6 +49,7 @@ app = FastAPI(
 app.include_router(estimations.router)
 app.include_router(sessions.router)
 app.include_router(embeddings_router.router)
+app.include_router(embeddings_router.material_router)
 
 
 # -------------------------

@@ -14,7 +14,7 @@ Pre-ejercicio: **pipeline mínimo de embeddings y chunking** sobre presupuestos 
 git checkout pre-session-07
 ```
 
-La entrega del programa pide una rama tipo `session-07/pre-exercise`; en este repo el desarrollo sigue la convención `pre-session-07` (igual que S4–S6).
+El material sugiere la rama `session-07/pre-exercise`; **este repo mantiene `pre-session-07`** (igual que S4–S6) para entrega y revisión.
 
 ## Objetivo en una frase
 

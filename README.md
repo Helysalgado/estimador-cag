@@ -6,7 +6,7 @@ Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y 
 |------|----------------|-------------------|
 | **Formulario (Sesión 4)** | Una petición, una estimación completa con enums tipados | `POST /api/v1/estimate` |
 | **Conversación (Sesión 5)** | Varios turnos en la misma sesión, con memoria y adjuntos | `POST /api/v1/sessions/{id}/estimate` |
-| **Embeddings (Sesión 7)** | Presupuestos JSON → chunks → vectores (en memoria, sin pgvector) | `POST /api/v1/embeddings/ingest` |
+| **Embeddings (Sesión 7)** | Presupuestos JSON → chunks → vectores (en memoria, sin pgvector) | `POST /api/v1/embeddings/ingest` (alias material: `POST /embeddings/ingest`) |
 
 El cliente **Streamlit** incluye los modos de formulario y conversación en pestañas. Cualquier otro backend puede consumir la API por HTTP.
 
@@ -91,7 +91,9 @@ jq -n --slurpfile b data/budgets_sample.json '{budgets: $b[0]}' \
   | jq '{stats, chunk_count: (.chunks | length), first_chunk_id: .chunks[0].chunk_id}'
 ```
 
-También puedes probar el body desde Swagger: `http://localhost:8000/docs` → **embeddings** → `POST /api/v1/embeddings/ingest`.
+También puedes probar el body desde Swagger: `http://localhost:8000/docs` → **embeddings** → `POST /api/v1/embeddings/ingest` (misma operación en `POST /embeddings/ingest`, alias del material).
+
+Tras `docker compose build api`, el contenedor incluye `scripts/compare.py` y `data/budgets_sample.json` en `/app`.
 
 Respuesta: `chunks[]` (cada uno con `embedding` de 1536 dimensiones) y `stats` (`total_budgets`, `total_chunks`, `total_tokens`, `estimated_cost_usd`).
 

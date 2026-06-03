@@ -14,10 +14,13 @@ from app.embedding_pipeline.embedder import (
 from app.embedding_pipeline.schemas import IngestRequest, IngestResponse, IngestStats
 
 router = APIRouter(prefix="/api/v1/embeddings", tags=["embeddings"])
+# Alias literal del material (mat-sesion7): POST /embeddings/ingest
+material_router = APIRouter(prefix="/embeddings", tags=["embeddings"])
 log = structlog.get_logger(__name__)
 
 
 @router.post("/ingest", response_model=IngestResponse)
+@material_router.post("/ingest", response_model=IngestResponse)
 def ingest_embeddings(request: IngestRequest) -> IngestResponse:
     """Chunk budgets structurally, embed each component, return vectors in memory."""
     chunker = JSONStructuralChunker()

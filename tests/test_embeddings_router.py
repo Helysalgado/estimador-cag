@@ -44,9 +44,13 @@ def test_ingest_returns_chunks_and_stats(
         fake_embed_many,
     )
 
-    response = client.post("/api/v1/embeddings/ingest", json=_one_budget_payload())
+    payload = _one_budget_payload()
+    response = client.post("/api/v1/embeddings/ingest", json=payload)
+    legacy = client.post("/embeddings/ingest", json=payload)
 
     assert response.status_code == 200
+    assert legacy.status_code == 200
+    assert legacy.json()["stats"] == response.json()["stats"]
     body = response.json()
     assert len(body["chunks"]) == 3
     assert body["chunks"][0]["chunk_id"] == "BUD-2024-014::AUTH-001"
