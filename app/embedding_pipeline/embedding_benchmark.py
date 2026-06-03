@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import sys
 import time
 from pathlib import Path
 from typing import Callable
@@ -10,7 +11,11 @@ from typing import Callable
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# Allow `uv run python app/embedding_pipeline/embedding_benchmark.py` from repo root.
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 load_dotenv(_REPO_ROOT / ".env")
 
 from app.config import settings
