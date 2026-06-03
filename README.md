@@ -1,19 +1,5 @@
 # Estimador CAG
 
-Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y plantillas **Jinja2** versionadas. Ofrece dos formas de uso:
-
-| Modo | Para qué sirve | Endpoint principal |
-|------|----------------|-------------------|
-| **Formulario (Sesión 4)** | Una petición, una estimación completa con enums tipados | `POST /api/v1/estimate` |
-| **Conversación (Sesión 5)** | Varios turnos en la misma sesión, con memoria y adjuntos | `POST /api/v1/sessions/{id}/estimate` |
-| **Embeddings (Sesión 7)** | Presupuestos JSON → chunks → vectores (en memoria, sin pgvector) | `POST /api/v1/embeddings/ingest` (alias material: `POST /embeddings/ingest`) |
-
-El cliente **Streamlit** incluye los modos de formulario y conversación en pestañas. Cualquier otro backend puede consumir la API por HTTP.
-
-Parte del programa **Master en AI Engineering**. Referencias: [LIDR session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator) y plan local [`docs/plans/session-05/`](docs/plans/session-05/README.md).
-
-## Stack
-
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white)
@@ -23,6 +9,18 @@ Parte del programa **Master en AI Engineering**. Referencias: [LIDR session_4/es
 ![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?logo=pytest&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 ![uv](https://img.shields.io/badge/uv-package_manager-DE5FE9)
+
+Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y plantillas **Jinja2** versionadas.
+
+| Modo | Para qué sirve | Endpoint principal |
+|------|----------------|-------------------|
+| **Formulario (Sesión 4)** | Una petición, una estimación completa con enums tipados | `POST /api/v1/estimate` |
+| **Conversación (Sesión 5)** | Varios turnos en la misma sesión, con memoria y adjuntos | `POST /api/v1/sessions/{id}/estimate` |
+| **Embeddings (Sesión 7)** | Presupuestos JSON → chunks → vectores (en memoria, sin pgvector) | `POST /api/v1/embeddings/ingest` (alias: `POST /embeddings/ingest`) |
+
+El cliente **Streamlit** cubre formulario y conversación en pestañas; el pipeline de embeddings se consume por HTTP (curl, Swagger u otro backend).
+
+Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md).
 
 ## Requisitos
 
@@ -71,51 +69,6 @@ uv run streamlit run streamlit_app.py
 
 - Pestaña **Conversación (Sesión 5)**: crea sesión automáticamente, chat multi-turno, adjuntos PDF/DOCX, metadata en la barra lateral.
 - Pestaña **Formulario clásico (Sesión 4)**: mismo flujo que antes (`POST /api/v1/estimate`).
-
----
-
-## Modo 3 — Pipeline de embeddings (Sesión 7)
-
-Presupuestos históricos en JSON → chunking estructural (1 componente = 1 chunk) → embeddings OpenAI `text-embedding-3-small`. Los vectores se devuelven en la respuesta HTTP; no hay persistencia en base vectorial (eso es Sesión 8).
-
-Datos de ejemplo: [`data/budgets_sample.json`](data/budgets_sample.json) (15 presupuestos). Sanity check de similitud: [`app/embedding_pipeline/SANITY_CHECK.md`](app/embedding_pipeline/SANITY_CHECK.md).
-
-### Ingest (API)
-
-```bash
-# Con la API en marcha (uvicorn :8000)
-jq -n --slurpfile b data/budgets_sample.json '{budgets: $b[0]}' \
-  | curl -s -X POST http://localhost:8000/api/v1/embeddings/ingest \
-      -H "Content-Type: application/json" \
-      -d @- \
-  | jq '{stats, chunk_count: (.chunks | length), first_chunk_id: .chunks[0].chunk_id}'
-```
-
-También puedes probar el body desde Swagger: `http://localhost:8000/docs` → **embeddings** → `POST /api/v1/embeddings/ingest` (misma operación en `POST /embeddings/ingest`, alias del material).
-
-Tras `docker compose build api`, el contenedor incluye `scripts/compare.py` y `data/budgets_sample.json` en `/app`.
-
-Respuesta: `chunks[]` (cada uno con `embedding` de 1536 dimensiones) y `stats` (`total_budgets`, `total_chunks`, `total_tokens`, `estimated_cost_usd`).
-
-### Comparar dos textos (CLI)
-
-Fuera del contenedor (carga `.env` automáticamente):
-
-```bash
-uv run python scripts/compare.py \
-  --text-a "OAuth 2.0 authentication backend for fintech" \
-  --text-b "JWT-based authorization service for banking app"
-```
-
-Dentro de Docker Compose (servicio `api`):
-
-```bash
-docker compose exec api python scripts/compare.py \
-  --text-a "OAuth 2.0 authentication backend for fintech" \
-  --text-b "JWT-based authorization service for banking app"
-```
-
-Requiere `OPENAI_API_KEY`. Plan de implementación: [`docs/plans/session-07/`](docs/plans/session-07/README.md).
 
 ---
 
@@ -266,6 +219,51 @@ curl -s -X POST "http://localhost:8000/api/v1/sessions/${SESSION_ID}/estimate-ac
 ```
 
 El endpoint **stateless** `POST /api/v1/estimate` sigue disponible y no comparte memoria con las sesiones.
+
+---
+
+## Modo 3 — Pipeline de embeddings (Sesión 7)
+
+Presupuestos históricos en JSON → chunking estructural (1 componente = 1 chunk) → embeddings OpenAI `text-embedding-3-small`. Los vectores se devuelven en la respuesta HTTP; no hay persistencia en base vectorial (eso es Sesión 8).
+
+Datos de ejemplo: [`data/budgets_sample.json`](data/budgets_sample.json) (15 presupuestos). Sanity check de similitud: [`app/embedding_pipeline/SANITY_CHECK.md`](app/embedding_pipeline/SANITY_CHECK.md).
+
+### Ingest (API)
+
+```bash
+# Con la API en marcha (uvicorn :8000)
+jq -n --slurpfile b data/budgets_sample.json '{budgets: $b[0]}' \
+  | curl -s -X POST http://localhost:8000/api/v1/embeddings/ingest \
+      -H "Content-Type: application/json" \
+      -d @- \
+  | jq '{stats, chunk_count: (.chunks | length), first_chunk_id: .chunks[0].chunk_id}'
+```
+
+También puedes probar el body desde Swagger: `http://localhost:8000/docs` → **embeddings** → `POST /api/v1/embeddings/ingest` (misma operación en `POST /embeddings/ingest`, alias del material).
+
+Tras `docker compose build api`, el contenedor incluye `scripts/compare.py` y `data/budgets_sample.json` en `/app`.
+
+Respuesta: `chunks[]` (cada uno con `embedding` de 1536 dimensiones) y `stats` (`total_budgets`, `total_chunks`, `total_tokens`, `estimated_cost_usd`).
+
+### Comparar dos textos (CLI)
+
+Fuera del contenedor (carga `.env` automáticamente):
+
+```bash
+uv run python scripts/compare.py \
+  --text-a "OAuth 2.0 authentication backend for fintech" \
+  --text-b "JWT-based authorization service for banking app"
+```
+
+Dentro de Docker Compose (servicio `api`):
+
+```bash
+docker compose exec api python scripts/compare.py \
+  --text-a "OAuth 2.0 authentication backend for fintech" \
+  --text-b "JWT-based authorization service for banking app"
+```
+
+Requiere `OPENAI_API_KEY`. Plan e informe de cumplimiento: [`docs/plans/session-07/`](docs/plans/session-07/README.md).
 
 ---
 
@@ -432,6 +430,7 @@ estimador-cag/
 │   │   ├── embedder.py
 │   │   ├── router.py
 │   │   ├── schemas.py
+│   │   ├── similarity.py
 │   │   └── SANITY_CHECK.md
 │   ├── schemas/
 │   │   ├── estimation.py
@@ -458,7 +457,9 @@ estimador-cag/
 │   └── validate_structure.py
 ├── docs/plans/session-04/
 ├── docs/plans/session-05/
+├── docs/plans/session-06/
 ├── docs/plans/session-07/
+├── evals/                      # Golden dataset + stress (Sesión 6)
 └── pyproject.toml
 ```
 
@@ -512,5 +513,14 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 
 - Plan Sesión 04: [`docs/plans/session-04/`](docs/plans/session-04/README.md)
 - Plan Sesión 05: [`docs/plans/session-05/`](docs/plans/session-05/README.md)
-- Plan Sesión 07: [`docs/plans/session-07/`](docs/plans/session-07/README.md)
+- Plan Sesión 06 (stress CAG): [`docs/plans/session-06/`](docs/plans/session-06/README.md) — incluye [`GAP-ANALISIS.md`](docs/plans/session-06/GAP-ANALISIS.md)
+- Plan Sesión 07 (embeddings): [`docs/plans/session-07/`](docs/plans/session-07/README.md) — incluye [`GAP-ANALISIS.md`](docs/plans/session-07/GAP-ANALISIS.md)
+- Índice de documentación: [`docs/README.md`](docs/README.md)
 - Texto de ejemplo para `description`: [`docs/transcripcion-reunion.md`](docs/transcripcion-reunion.md)
+
+## Ramas de desarrollo
+
+| Rama | Contenido principal |
+|------|---------------------|
+| `pre-session-06` | Stress evals, `turn_observed`, reportes |
+| `pre-session-07` | Pipeline `embedding_pipeline` + ingest + `compare.py` (incluye base S6) |
