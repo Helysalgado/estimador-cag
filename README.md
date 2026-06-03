@@ -6,8 +6,9 @@ Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y 
 |------|----------------|-------------------|
 | **Formulario (Sesión 4)** | Una petición, una estimación completa con enums tipados | `POST /api/v1/estimate` |
 | **Conversación (Sesión 5)** | Varios turnos en la misma sesión, con memoria y adjuntos | `POST /api/v1/sessions/{id}/estimate` |
+| **Embeddings (Sesión 7)** | Presupuestos JSON → chunks → vectores (en memoria, sin pgvector) | `POST /api/v1/embeddings/ingest` |
 
-El cliente **Streamlit** incluye ambos modos en pestañas. Cualquier otro backend puede consumir la API por HTTP.
+El cliente **Streamlit** incluye los modos de formulario y conversación en pestañas. Cualquier otro backend puede consumir la API por HTTP.
 
 Parte del programa **Master en AI Engineering**. Referencias: [LIDR session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator) y plan local [`docs/plans/session-05/`](docs/plans/session-05/README.md).
 
@@ -70,6 +71,49 @@ uv run streamlit run streamlit_app.py
 
 - Pestaña **Conversación (Sesión 5)**: crea sesión automáticamente, chat multi-turno, adjuntos PDF/DOCX, metadata en la barra lateral.
 - Pestaña **Formulario clásico (Sesión 4)**: mismo flujo que antes (`POST /api/v1/estimate`).
+
+---
+
+## Modo 3 — Pipeline de embeddings (Sesión 7)
+
+Presupuestos históricos en JSON → chunking estructural (1 componente = 1 chunk) → embeddings OpenAI `text-embedding-3-small`. Los vectores se devuelven en la respuesta HTTP; no hay persistencia en base vectorial (eso es Sesión 8).
+
+Datos de ejemplo: [`data/budgets_sample.json`](data/budgets_sample.json) (15 presupuestos). Sanity check de similitud: [`app/embedding_pipeline/SANITY_CHECK.md`](app/embedding_pipeline/SANITY_CHECK.md).
+
+### Ingest (API)
+
+```bash
+# Con la API en marcha (uvicorn :8000)
+jq -n --slurpfile b data/budgets_sample.json '{budgets: $b[0]}' \
+  | curl -s -X POST http://localhost:8000/api/v1/embeddings/ingest \
+      -H "Content-Type: application/json" \
+      -d @- \
+  | jq '{stats, chunk_count: (.chunks | length), first_chunk_id: .chunks[0].chunk_id}'
+```
+
+También puedes probar el body desde Swagger: `http://localhost:8000/docs` → **embeddings** → `POST /api/v1/embeddings/ingest`.
+
+Respuesta: `chunks[]` (cada uno con `embedding` de 1536 dimensiones) y `stats` (`total_budgets`, `total_chunks`, `total_tokens`, `estimated_cost_usd`).
+
+### Comparar dos textos (CLI)
+
+Fuera del contenedor (carga `.env` automáticamente):
+
+```bash
+uv run python scripts/compare.py \
+  --text-a "OAuth 2.0 authentication backend for fintech" \
+  --text-b "JWT-based authorization service for banking app"
+```
+
+Dentro de Docker Compose (servicio `api`):
+
+```bash
+docker compose exec api python scripts/compare.py \
+  --text-a "OAuth 2.0 authentication backend for fintech" \
+  --text-b "JWT-based authorization service for banking app"
+```
+
+Requiere `OPENAI_API_KEY`. Plan de implementación: [`docs/plans/session-07/`](docs/plans/session-07/README.md).
 
 ---
 
@@ -315,6 +359,13 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_estimate_*.py` | Estimate stateless y cache |
 | `tests/test_llm_wrapper.py` | LiteLLM, mensajes multi-turno |
 | `tests/test_health.py` | Health check |
+| `tests/test_embedding_schemas.py` | Schemas de presupuestos/chunks |
+| `tests/test_chunker.py` | Chunker estructural JSON |
+| `tests/test_embedder.py` | Batching y reintentos del embedder (mock) |
+| `tests/test_embeddings_router.py` | `POST /api/v1/embeddings/ingest` |
+| `tests/test_similarity.py` | Similitud coseno (stdlib) |
+
+Los tests de embeddings **no** llaman a OpenAI; el sanity check manual sí (ver `SANITY_CHECK.md`).
 
 ### Evals (Session 06 parity)
 
@@ -374,6 +425,12 @@ estimador-cag/
 │   ├── routers/
 │   │   ├── estimations.py      # POST /api/v1/estimate (+ /stream)
 │   │   └── sessions.py         # POST /api/v1/sessions, .../estimate
+│   ├── embedding_pipeline/     # Sesión 7: chunker, embedder, ingest
+│   │   ├── chunker.py
+│   │   ├── embedder.py
+│   │   ├── router.py
+│   │   ├── schemas.py
+│   │   └── SANITY_CHECK.md
 │   ├── schemas/
 │   │   ├── estimation.py
 │   │   └── sessions.py
@@ -392,8 +449,14 @@ estimador-cag/
 │       └── cache.py
 ├── tests/
 ├── streamlit_app.py
+├── data/
+│   └── budgets_sample.json     # 15 presupuestos (Sesión 7)
+├── scripts/
+│   ├── compare.py              # Similitud coseno entre dos textos
+│   └── validate_structure.py
 ├── docs/plans/session-04/
 ├── docs/plans/session-05/
+├── docs/plans/session-07/
 └── pyproject.toml
 ```
 
@@ -447,4 +510,5 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 
 - Plan Sesión 04: [`docs/plans/session-04/`](docs/plans/session-04/README.md)
 - Plan Sesión 05: [`docs/plans/session-05/`](docs/plans/session-05/README.md)
+- Plan Sesión 07: [`docs/plans/session-07/`](docs/plans/session-07/README.md)
 - Texto de ejemplo para `description`: [`docs/transcripcion-reunion.md`](docs/transcripcion-reunion.md)
