@@ -1,5 +1,7 @@
 """Request and response models for conversational session endpoints."""
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -30,6 +32,24 @@ class ProjectMetadataView(BaseModel):
     rejected_options: list[str] = Field(default_factory=list)
 
 
+class TurnObservation(BaseModel):
+    """Per-turn telemetry for stress evals and observability."""
+
+    turn_index: int = Field(ge=1)
+    session_id: str
+    enriched_transcript_chars: int = Field(ge=0)
+    attachments_total_chars: int = Field(ge=0)
+    messages_in_window: int = Field(ge=0)
+    anchors_count: int = Field(ge=0)
+    summary_chars: int = Field(ge=0)
+    tokens_in: int = Field(ge=0)
+    tokens_out: int = Field(ge=0)
+    cost_usd: float = Field(ge=0)
+    latency_ms: int = Field(ge=0)
+    cache_hit_kind: Literal["none", "exact", "semantic"] = "none"
+    last_resolved_tier: str | None = None
+
+
 class SessionEstimationResponse(BaseModel):
     """Estimation for one session turn, including memory snapshot for the UI."""
 
@@ -39,6 +59,10 @@ class SessionEstimationResponse(BaseModel):
     tier: str = Field(default="default", description="Tier resolved for this response.")
     tier_rule: str = Field(default="default_rule", description="Rule used to resolve tier.")
     project_metadata: ProjectMetadataView
+    observation: TurnObservation | None = Field(
+        default=None,
+        description="Per-turn telemetry; populated on every conversational estimate.",
+    )
 
 
 class SessionDebugResponse(BaseModel):

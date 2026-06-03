@@ -66,6 +66,10 @@ def test_estimate_session_turn_updates_history_and_metadata(monkeypatch):
     assert response.text == "Turn one estimation with React noted."
     assert response.prompt_version == "v1"
     assert response.turn_count == 1
+    assert response.observation is not None
+    assert response.observation.turn_index == 1
+    assert response.observation.session_id == "test-session"
+    assert response.observation.tokens_in == 120
     assert session.history.turn_count == 1
     assert "React" in session.metadata.mentioned_technologies
     assert session.metadata.assumed_team_size == 3

@@ -6,7 +6,13 @@ import re
 import structlog
 
 from app.prompts.loader import render_session_system_prompt
-from app.schemas.sessions import ACBIterationView, ACBResponse, ProjectMetadataView, SessionEstimationResponse
+from app.schemas.sessions import (
+    ACBIterationView,
+    ACBResponse,
+    ProjectMetadataView,
+    SessionEstimationResponse,
+    TurnObservation,
+)
 from app.sessions.metadata_extractor import extract_project_metadata_update, merge_metadata
 from app.sessions.tier_resolver import resolve_tier
 from app.services.boss import boss_decide
@@ -163,23 +169,23 @@ def estimate_session_turn(
         history_turns=session.history.turn_count,
         metadata_populated=session.metadata.has_content(),
     )
-    turn_observed = {
-        "turn_index": session.history.turn_count,
-        "session_id": session.session_id,
-        "enriched_transcript_chars": len(user_turn),
-        "attachments_total_chars": attachments_total_chars,
-        "messages_in_window": len(session.history._messages),  # noqa: SLF001
-        "anchors_count": len(session.anchors),
-        "summary_chars": len(session.rolling_summary),
-        "tokens_in": result.get("tokens_in"),
-        "tokens_out": result.get("tokens_out"),
-        "cost_usd": result.get("cost_usd", 0.0),
-        "latency_ms": result.get("latency_ms"),
-        "cache_hit_kind": cache_hit_kind,
-        "last_resolved_tier": session.last_resolved_tier,
-    }
-    session.last_turn_observed = turn_observed
-    log.info("turn_observed", **turn_observed)
+    observation = TurnObservation(
+        turn_index=session.history.turn_count,
+        session_id=session.session_id,
+        enriched_transcript_chars=len(user_turn),
+        attachments_total_chars=attachments_total_chars,
+        messages_in_window=len(session.history._messages),  # noqa: SLF001
+        anchors_count=len(session.anchors),
+        summary_chars=len(session.rolling_summary),
+        tokens_in=int(result.get("tokens_in") or 0),
+        tokens_out=int(result.get("tokens_out") or 0),
+        cost_usd=float(result.get("cost_usd") or 0.0),
+        latency_ms=int(result.get("latency_ms") or 0),
+        cache_hit_kind=cache_hit_kind if cache_hit_kind in {"none", "exact", "semantic"} else "none",
+        last_resolved_tier=session.last_resolved_tier,
+    )
+    session.last_turn_observed = observation.model_dump()
+    log.info("turn_observed", **session.last_turn_observed)
 
     return SessionEstimationResponse(
         text=assistant_text,
@@ -188,6 +194,7 @@ def estimate_session_turn(
         tier=tier,
         tier_rule=rule,
         project_metadata=ProjectMetadataView.model_validate(session.metadata),
+        observation=observation,
     )
 
 

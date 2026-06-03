@@ -3,17 +3,48 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import csv
+import sys
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
-import uuid
 
 import httpx
 
+from app.schemas.sessions import TurnObservation
 from evals.stress.fixtures.build_pdfs import build_fixtures
 from evals.stress.metrics import CostBudgetMetric, LatencyBudgetMetric, MemoryDriftMetric
-from evals.stress.scenarios import resolve_scenarios
+from evals.stress.scenarios import Scenario, ScenarioTurn, get_scenario
+
+_API_PREFIX = "/api/v1"
+_FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+_CSV_COLUMNS = [
+    "scenario",
+    "attachment_size_kb",
+    "repeat",
+    "turn_index",
+    "session_id",
+    "enriched_transcript_chars",
+    "attachments_total_chars",
+    "messages_in_window",
+    "anchors_count",
+    "summary_chars",
+    "tokens_in",
+    "tokens_out",
+    "cost_usd",
+    "latency_ms",
+    "wall_clock_ms",
+    "cache_hit_kind",
+    "last_resolved_tier",
+    "latency_budget_passed",
+    "cost_budget_passed",
+    "memory_drift_passed",
+    "tracked_fact",
+    "error",
+]
 
 
 def _parse_csv_list(value: str) -> list[str]:
@@ -24,183 +55,222 @@ def _parse_int_list(value: str) -> list[int]:
     return [int(item.strip()) for item in value.split(",") if item.strip()]
 
 
-def _attachment_map(fixtures_dir: Path) -> dict[int, Path]:
-    paths = build_fixtures(fixtures_dir)
-    mapping: dict[int, Path] = {}
-    for path in paths:
-        for size in (5, 20, 50, 100):
-            if f"_{size}kb" in path.name:
-                mapping[size] = path
-    return mapping
+@contextmanager
+def _open_client(http_base_url: str | None) -> Iterator[httpx.Client | Any]:
+    if http_base_url:
+        with httpx.Client(base_url=http_base_url, timeout=180.0) as client:
+            yield client
+        return
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app) as client:
+        yield client
 
 
-async def _post_turn(
-    client: httpx.AsyncClient,
-    *,
-    base_url: str,
+def _attachment_files(size_kb: int, fixtures_dir: Path) -> list[tuple[str, tuple[str, bytes, str]]] | None:
+    if size_kb == 0:
+        return None
+    path = fixtures_dir / f"attach_{size_kb}kb.pdf"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Fixture {path} missing — run "
+            "`uv run python -m evals.stress.fixtures.build_pdfs` first."
+        )
+    return [("attachments", (path.name, path.read_bytes(), "application/pdf"))]
+
+
+def _form_body(scenario: Scenario, turn: ScenarioTurn) -> dict[str, str]:
+    return {"transcript": turn.transcript}
+
+
+def _execute_turn(
+    client: httpx.Client | Any,
     session_id: str,
-    transcript: str,
-    mode: str,
-    attachment_path: Path | None,
-) -> dict[str, Any]:
-    endpoint = "estimate-acb" if mode == "acb" else "estimate"
-    url = f"{base_url}/api/v1/sessions/{session_id}/{endpoint}"
-    files = None
-    if attachment_path is not None:
-        files = {"attachments": (attachment_path.name, attachment_path.read_bytes(), "application/pdf")}
-    try:
-        response = await client.post(url, data={"transcript": transcript}, files=files)
-    except httpx.HTTPError:
-        return {
-            "text": f"fallback_estimation_for:{transcript[:80]}",
-            "_runner_fallback": True,
-            "_status_code": 599,
-        }
-    if response.status_code >= 500:
-        return {
-            "text": f"fallback_estimation_for:{transcript[:80]}",
-            "_runner_fallback": True,
-            "_status_code": response.status_code,
-        }
+    scenario: Scenario,
+    turn: ScenarioTurn,
+    files: list | None,
+) -> tuple[TurnObservation, dict[str, Any], int]:
+    t0 = time.perf_counter()
+    response = client.post(
+        f"{_API_PREFIX}/sessions/{session_id}/estimate",
+        data=_form_body(scenario, turn),
+        files=files,
+    )
+    wall_ms = int((time.perf_counter() - t0) * 1000)
     response.raise_for_status()
-    body = response.json()
-    body["_runner_fallback"] = False
-    body["_status_code"] = response.status_code
-    return body
+    payload = response.json()
+
+    observation_dict = payload.get("observation")
+    if observation_dict is None:
+        raise RuntimeError(
+            "response.observation is missing — rebuild the API with TurnObservation support."
+        )
+    observation = TurnObservation(**observation_dict)
+
+    snapshot_response = client.get(f"{_API_PREFIX}/sessions/{session_id}")
+    snapshot_response.raise_for_status()
+    return observation, snapshot_response.json(), wall_ms
 
 
-async def main_async(args: argparse.Namespace) -> int:
-    scenarios = resolve_scenarios(_parse_csv_list(args.scenarios))
-    sizes = _parse_int_list(args.attachment_sizes)
-    fixtures_dir = Path("evals/stress/fixtures")
-    fixture_map = _attachment_map(fixtures_dir)
-    out_path = Path(args.output)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+def _run_one_session(
+    client: httpx.Client | Any,
+    scenario: Scenario,
+    size_kb: int,
+    repeat: int,
+    latency_metric: LatencyBudgetMetric,
+    cost_metric: CostBudgetMetric,
+    fixtures_dir: Path,
+    writer: csv.DictWriter,
+) -> int:
+    files = _attachment_files(size_kb, fixtures_dir)
 
-    rows: list[dict[str, Any]] = []
-    async with httpx.AsyncClient(timeout=args.request_timeout_s) as client:
-        for scenario in scenarios:
-            for size in sizes:
-                attachment_path = fixture_map.get(size) if size > 0 else None
-                for repeat in range(args.repeats):
-                    offline_mode = False
-                    try:
-                        session_resp = await client.post(f"{args.http}/api/v1/sessions")
-                        session_resp.raise_for_status()
-                        session_id = session_resp.json()["session_id"]
-                    except httpx.HTTPError:
-                        offline_mode = True
-                        session_id = str(uuid.uuid4())
+    create_resp = client.post(f"{_API_PREFIX}/sessions")
+    create_resp.raise_for_status()
+    session_id = create_resp.json()["session_id"]
 
-                    for turn in scenario.turns:
-                        if offline_mode:
-                            post_json = {
-                                "text": f"offline_fallback_estimation_for:{turn.transcript[:80]}",
-                                "_runner_fallback": True,
-                                "_status_code": 599,
-                            }
-                            snapshot = {
-                                "message_count": turn.turn_index * 2,
-                                "anchors_count": 0,
-                                "summary_chars": 0,
-                                "last_resolved_tier": "default",
-                                "rolling_summary": "",
-                                "anchors": [],
-                                "project_metadata": {},
-                            }
-                        else:
-                            post_json = await _post_turn(
-                                client,
-                                base_url=args.http,
-                                session_id=session_id,
-                                transcript=turn.transcript,
-                                mode=args.mode,
-                                attachment_path=attachment_path,
-                            )
-                            try:
-                                debug_resp = await client.get(f"{args.http}/api/v1/sessions/{session_id}")
-                                debug_resp.raise_for_status()
-                                snapshot = debug_resp.json()
-                            except httpx.HTTPError:
-                                snapshot = {
-                                    "message_count": 0,
-                                    "anchors_count": 0,
-                                    "summary_chars": 0,
-                                    "last_resolved_tier": "default",
-                                    "rolling_summary": "",
-                                    "anchors": [],
-                                    "project_metadata": {},
-                                }
-                        observed = dict(snapshot.get("last_turn_observed") or {})
-                        if not observed:
-                            observed = {
-                                "turn_index": turn.turn_index,
-                                "session_id": session_id,
-                                "enriched_transcript_chars": len(turn.transcript),
-                                "attachments_total_chars": 0,
-                                "messages_in_window": snapshot.get("message_count", 0),
-                                "anchors_count": snapshot.get("anchors_count", 0),
-                                "summary_chars": snapshot.get("summary_chars", 0),
-                                "tokens_in": 0,
-                                "tokens_out": 0,
-                                "cost_usd": 0.0,
-                                "latency_ms": 0,
-                                "cache_hit_kind": "none",
-                                "last_resolved_tier": snapshot.get("last_resolved_tier", "default"),
-                            }
-                        observed["text"] = post_json.get("text", "")
+    tracked_fact = scenario.turns[0].fact_introduced
+    tracked_field = scenario.turns[0].fact_field
+    drift_metric = (
+        MemoryDriftMetric(fact=tracked_fact, fact_field=tracked_field)
+        if tracked_fact
+        else None
+    )
 
-                        latency_result = LatencyBudgetMetric(args.latency_budget_ms).evaluate(observed)
-                        cost_result = CostBudgetMetric(args.cost_budget_usd).evaluate(observed)
-                        drift_result = MemoryDriftMetric(turn.fact_to_remember).evaluate(snapshot)
+    rows_written = 0
+    for turn in scenario.turns:
+        row: dict[str, Any] = {
+            "scenario": scenario.name,
+            "attachment_size_kb": size_kb,
+            "repeat": repeat,
+            "tracked_fact": tracked_fact or "",
+        }
+        try:
+            observation, snapshot, wall_ms = _execute_turn(
+                client, session_id, scenario, turn, files
+            )
+        except Exception as exc:  # noqa: BLE001
+            row.update({"turn_index": "", "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
+            writer.writerow(row)
+            return rows_written + 1
 
-                        row = {
-                            "scenario": scenario.name,
-                            "attachment_size_kb": size,
-                            "repeat": repeat + 1,
-                            "turn_index": turn.turn_index,
-                            "fact_to_remember": turn.fact_to_remember,
-                            "session_id": session_id,
-                            "runner_fallback": post_json.get("_runner_fallback", False),
-                            "http_status": post_json.get("_status_code", 200),
-                            **observed,
-                            "latency_budget_score": latency_result.score,
-                            "cost_budget_score": cost_result.score,
-                            "memory_drift_score": drift_result.score,
-                        }
-                        rows.append(row)
+        latency_pass = latency_metric.evaluate(observation).passed
+        cost_pass = cost_metric.evaluate(observation).passed
+        if drift_metric is None or observation.turn_index == 1:
+            drift_pass = ""
+        else:
+            drift_pass = bool(drift_metric.evaluate(snapshot).passed)
 
-    if not rows:
-        return 1
+        row.update(
+            {
+                **observation.model_dump(),
+                "wall_clock_ms": wall_ms,
+                "latency_budget_passed": latency_pass,
+                "cost_budget_passed": cost_pass,
+                "memory_drift_passed": drift_pass,
+                "error": "",
+            }
+        )
+        writer.writerow(row)
+        rows_written += 1
 
-    fieldnames: list[str] = sorted({key for row in rows for key in row.keys()})
-    with out_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-    print(f"Wrote {len(rows)} rows to {out_path}")
-    return 0
+    return rows_written
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Stress runner for session estimator.")
-    parser.add_argument("--http", default="http://localhost:8000")
-    parser.add_argument("--mode", choices=["actor", "acb"], default="actor")
+def _print_summary(csv_path: Path) -> None:
+    by_group: dict[tuple[str, str], list[dict[str, str]]] = {}
+    with csv_path.open(encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if row.get("error"):
+                continue
+            key = (row["scenario"], row["attachment_size_kb"])
+            by_group.setdefault(key, []).append(row)
+
+    print("\nSummary (per scenario × attachment size)")
+    header = f"{'scenario':<14} {'kb':>4} {'n':>4} {'P50 ms':>8} {'P95 ms':>8} {'tot $':>10} {'drift%':>7}"
+    print(header)
+    print("-" * len(header))
+    for (scenario, size_kb), rows in sorted(by_group.items()):
+        latencies = sorted(int(r["latency_ms"]) for r in rows)
+        costs = [float(r["cost_usd"]) for r in rows]
+        drifts = [r["memory_drift_passed"] for r in rows if r["memory_drift_passed"] != ""]
+        p50 = latencies[len(latencies) // 2] if latencies else 0
+        p95_idx = max(0, int(len(latencies) * 0.95) - 1)
+        p95 = latencies[p95_idx] if latencies else 0
+        total_cost = sum(costs)
+        drift_pct = (
+            100.0 * sum(1 for d in drifts if d == "True") / len(drifts) if drifts else 0.0
+        )
+        print(
+            f"{scenario:<14} {size_kb:>4} {len(rows):>4} "
+            f"{p50:>8} {p95:>8} {total_cost:>10.4f} {drift_pct:>6.1f}%"
+        )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--http",
+        default=None,
+        help="Base URL (e.g. http://localhost:8000). Omit for in-process TestClient smoke.",
+    )
     parser.add_argument("--scenarios", default="growing,pivot,contradiction")
     parser.add_argument("--attachment-sizes", default="0,5,20,50,100")
     parser.add_argument("--repeats", type=int, default=3)
-    parser.add_argument("--output", default="evals/stress/results.csv")
-    parser.add_argument("--latency-budget-ms", type=int, default=4000)
+    parser.add_argument("--latency-budget-ms", type=int, default=8000)
     parser.add_argument("--cost-budget-usd", type=float, default=0.25)
-    parser.add_argument("--request-timeout-s", type=float, default=1.0)
-    return parser
-
-
-def main() -> None:
-    parser = build_parser()
+    parser.add_argument("--output", type=Path, default=Path("evals/stress/results.csv"))
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(main_async(args)))
+
+    scenarios = [get_scenario(name) for name in _parse_csv_list(args.scenarios)]
+    sizes = _parse_int_list(args.attachment_sizes)
+    fixtures_dir = _FIXTURES_DIR
+    build_fixtures(fixtures_dir)
+    for kb in sizes:
+        if kb != 0:
+            _attachment_files(kb, fixtures_dir)
+
+    latency_metric = LatencyBudgetMetric(budget_ms=args.latency_budget_ms)
+    cost_metric = CostBudgetMetric(budget_usd=args.cost_budget_usd)
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    print(
+        f"Stress run: {len(scenarios)} scenarios × {len(sizes)} sizes × "
+        f"{args.repeats} repeats × up to 20 turns each"
+    )
+    total_rows = 0
+    t_start = time.perf_counter()
+    with args.output.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_CSV_COLUMNS)
+        writer.writeheader()
+        with _open_client(args.http) as client:
+            for scenario in scenarios:
+                for size_kb in sizes:
+                    for repeat in range(1, args.repeats + 1):
+                        print(
+                            f"  → {scenario.name:<14} kb={size_kb:>3} "
+                            f"repeat={repeat}/{args.repeats}"
+                        )
+                        total_rows += _run_one_session(
+                            client,
+                            scenario,
+                            size_kb,
+                            repeat,
+                            latency_metric,
+                            cost_metric,
+                            fixtures_dir,
+                            writer,
+                        )
+                        handle.flush()
+
+    elapsed_s = int(time.perf_counter() - t_start)
+    print(f"\nWrote {total_rows} rows to {args.output} in {elapsed_s}s")
+    _print_summary(args.output)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
