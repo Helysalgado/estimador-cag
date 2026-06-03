@@ -1,6 +1,10 @@
 # Planes de implementación — Sesión 4 (estimador-cag)
 
-Esta carpeta contiene los planes **paso a paso** para migrar `estimador-cag` al estado objetivo de la [Sesión 4 — estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator):
+Esta carpeta contiene los planes **paso a paso** para migrar `estimador-cag` al estado objetivo de la [Sesión 4 — estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator).
+
+**Auditoría de cumplimiento (vs `mat-sesion4.md` y LIDR S4):** ver **[AJUSTES.md](./AJUSTES.md)** — conclusión: S4 cumplida; solo ajustes menores opcionales.
+
+Estado objetivo original:
 
 - **Frontend:** formulario tipado (ya no chat).
 - **Backend:** contrato Pydantic estrecho + prompts en **Jinja2 versionados**.

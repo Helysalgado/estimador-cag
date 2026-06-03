@@ -2,7 +2,8 @@
 
 Este documento registra el plan **ejecutado en código** para llevar `estimador-cag` a paridad técnica del pre-ejercicio en la rama `pre-session-06`.
 
-Para el contraste contra `mat-sesion6.md` (qué falta para entrega final con datos reales), ver **[GAP-ANALISIS.md](./GAP-ANALISIS.md)**.
+- Análisis de brechas: **[GAP-ANALISIS.md](./GAP-ANALISIS.md)**
+- **Plan de lo pendiente (implementar):** **[PLAN-IMPLEMENTACION.md](./PLAN-IMPLEMENTACION.md)**
 
 ## Objetivo
 

@@ -2,6 +2,8 @@
 
 Este plan aterriza el ejercicio de clase de Sesión 5 sobre el estado actual del repo.
 
+**Informe de cumplimiento** (vs `mat-sesion5.md` y [LIDR session_5/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_5/estimator)): **[CUMPLIMIENTO.md](./CUMPLIMIENTO.md)** — conclusión: **Sesión 5 cumplida**; ajustes opcionales de paridad LIDR documentados ahí.
+
 ## Objetivo
 
 Pasar de un estimator transaccional (una petición, una respuesta) a un flujo conversacional con:

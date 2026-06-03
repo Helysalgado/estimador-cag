@@ -3,14 +3,17 @@
 ## Planes de implementación
 
 - Sesión 4 (formulario tipado + prompts Jinja2):
-  - **[`plans/session-04/`](./plans/session-04/README.md)**
+  - **[`plans/session-04/`](./plans/session-04/README.md)** — plan de implementación
+  - **[`plans/session-04/AJUSTES.md`](./plans/session-04/AJUSTES.md)** — cumplimiento vs LIDR y ajustes opcionales
 
 - Sesión 5 (memoria conversacional + adjuntos):
-  - **[`plans/session-05/`](./plans/session-05/README.md)**
+  - **[`plans/session-05/`](./plans/session-05/README.md)** — plan de implementación
+  - **[`plans/session-05/CUMPLIMIENTO.md`](./plans/session-05/CUMPLIMIENTO.md)** — cumplimiento vs material y LIDR S5
 
 - Sesión 6 (stress CAG + observabilidad por turno):
   - **[`plans/session-06/`](./plans/session-06/README.md)** — bitácora de implementación
-  - **[`plans/session-06/GAP-ANALISIS.md`](./plans/session-06/GAP-ANALISIS.md)** — cumplimiento vs material y pendientes
+  - **[`plans/session-06/GAP-ANALISIS.md`](./plans/session-06/GAP-ANALISIS.md)** — cumplimiento vs material
+  - **[`plans/session-06/PLAN-IMPLEMENTACION.md`](./plans/session-06/PLAN-IMPLEMENTACION.md)** — qué falta implementar (vs LIDR S6)
 
 ## Texto de entrada de ejemplo
 
