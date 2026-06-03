@@ -333,12 +333,30 @@ Incluye 16 casos en `evals/golden_dataset.json` y 3 métricas binarias:
 Stress runner (escenarios multi-turno + adjuntos + CSV):
 
 ```bash
-uv run python -m evals.stress.run --http http://127.0.0.1:8000 --output evals/stress/results.csv
+# API en marcha (uvicorn en :8000) y claves LLM en .env
+uv run python -m evals.stress.run \
+  --http http://127.0.0.1:8000 \
+  --scenarios growing,pivot,contradiction \
+  --attachment-sizes 0,5,20,50,100 \
+  --repeats 3 \
+  --mode actor \
+  --latency-budget-ms 8000 \
+  --cost-budget-usd 0.25 \
+  --max-error-rate 0.2 \
+  --output evals/stress/results.csv
+
+# Smoke in-process (sin LLM real, útil en CI):
+# uv run python -m evals.stress.run --scenarios growing --attachment-sizes 0 --repeats 1
+
+# Reporte cuantitativo desde el CSV (Fase 5)
+uv run python -m evals.stress.build_report
 ```
 
 Artefactos generados:
 - `evals/stress/results.csv`
-- `evals/stress/REPORT.md`
+- `evals/stress/REPORT.md` (regenerable con `build_report`)
+
+Coste orientativo de la corrida completa: ~900 llamadas LLM (3 escenarios × 5 tamaños × 3 repeticiones × 20 turnos). Para validar el pipeline antes, usa un solo escenario y `--repeats 1`.
 
 ```bash
 uv run python scripts/validate_structure.py

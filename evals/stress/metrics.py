@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from app.schemas.sessions import TurnObservation
 from evals.metrics import MetricResult
+from evals.stress.schema import STRESS_MARKER
 
 FactField = Literal["project_name", "technologies", "scope", "summary", "any"]
 
@@ -87,3 +88,31 @@ class MemoryDriftMetric:
         if self.fact_field == "summary":
             return str(snapshot.get("rolling_summary") or snapshot.get("summary") or "")
         return json.dumps(snapshot, default=str)
+
+
+class AttachmentRecallMetric:
+    """1.0 if the PDF marker appears in the assistant text or session snapshot."""
+
+    name = "attachment_recall"
+
+    def __init__(self, marker: str = STRESS_MARKER) -> None:
+        self.needle = marker.lower()
+
+    def evaluate(self, *, response_text: str, snapshot: dict[str, Any]) -> MetricResult:
+        anchors = snapshot.get("anchors") or []
+        anchor_text = " ".join(str(item.get("text", "")) for item in anchors)
+        haystack = " ".join(
+            [
+                response_text,
+                str(snapshot.get("rolling_summary") or ""),
+                anchor_text,
+                str(snapshot.get("project_metadata") or snapshot.get("metadata") or ""),
+            ]
+        ).lower()
+        found = self.needle in haystack
+        return MetricResult(
+            name=self.name,
+            score=1.0 if found else 0.0,
+            passed=found,
+            details=f"marker={STRESS_MARKER!r} {'present' if found else 'missing'}",
+        )

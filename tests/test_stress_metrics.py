@@ -1,5 +1,11 @@
 from app.schemas.sessions import TurnObservation
-from evals.stress.metrics import CostBudgetMetric, LatencyBudgetMetric, MemoryDriftMetric
+from evals.stress.metrics import (
+    AttachmentRecallMetric,
+    CostBudgetMetric,
+    LatencyBudgetMetric,
+    MemoryDriftMetric,
+)
+from evals.stress.schema import STRESS_MARKER
 
 
 def _obs(**kwargs: object) -> TurnObservation:
@@ -53,3 +59,15 @@ def test_memory_drift_metric_pass_fail_limit():
     assert any_metric.evaluate(
         {"rolling_summary": "", "anchors": [{"text": "Flutter SDK"}], "project_metadata": {}}
     ).passed is True
+
+
+def test_attachment_recall_metric_finds_marker_in_response():
+    metric = AttachmentRecallMetric()
+    assert metric.evaluate(
+        response_text=f"See {STRESS_MARKER} in the attachment summary.",
+        snapshot={"rolling_summary": "", "anchors": []},
+    ).passed is True
+    assert metric.evaluate(
+        response_text="No marker here.",
+        snapshot={"rolling_summary": "", "anchors": []},
+    ).passed is False

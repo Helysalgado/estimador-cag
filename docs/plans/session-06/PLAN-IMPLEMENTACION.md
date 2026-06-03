@@ -163,13 +163,13 @@ uv run python -m evals.stress.run \
 
 ### Fase 5 — Reporte cuantitativo (P0, ~2 h)
 
-| Tarea | Entregable |
-|-------|------------|
-| `evals/stress/build_report.py` | Lee `results.csv` → regenera `REPORT.md` |
-| Tabla resumen | Por `scenario × attachment_size_kb`: P50/P95 latency, costo total, recall drift medio, cache (exact/semantic N/A) |
-| Tres curvas en tabla | latency vs tokens_in; costo acumulado vs turn_index; drift vs N |
-| Dos párrafos | Con cifras reales (ej. “a partir del turno 12…”, “turno 20 cuesta X× turno 1”) |
-| README | Sección “Reproducir stress S6” con prerequisitos y coste estimado |
+| Tarea | Entregable | Estado |
+|-------|------------|--------|
+| `evals/stress/build_report.py` | Lee `results.csv` → regenera `REPORT.md` | Hecho |
+| Tabla resumen | Por `scenario × attachment_size_kb`: P50/P95 latency, costo total, recall drift medio, cache (exact/semantic N/A) | Hecho |
+| Tres curvas en tabla | latency vs tokens_in; costo acumulado vs turn_index; drift vs N | Hecho |
+| Dos párrafos | Con cifras reales (ej. “a partir del turno 12…”, “turno 20 cuesta X× turno 1”) | Hecho (con datos actuales; turno máx 6) |
+| README | Sección “Reproducir stress S6” con prerequisitos y coste estimado | Hecho |
 
 **Commit sugerido:** `doc(stress): regenerate REPORT.md from results with quantitative analysis`
 
@@ -218,12 +218,14 @@ No ejecutar Fase 4 antes de F1–F3: el CSV actual con fallback no sirve para el
 ## Checklist final “hecho” (material + entrega)
 
 - [x] Código: `turn_observed`, stress package, métricas, tests unitarios stress
-- [ ] `POST .../estimate` devuelve `observation` en JSON (recomendado LIDR)
-- [ ] Escenarios con **20 turnos** cada uno
-- [ ] `evals/stress.run` end-to-end sin fallback dominante
-- [ ] `results.csv` con matriz completa y datos reales
-- [ ] `REPORT.md` con tablas + **2 afirmaciones cuantitativas** no triviales
-- [ ] README actualizado (reproducir stress)
+- [x] `POST .../estimate` devuelve `observation` en JSON
+- [x] Escenarios con **20 turnos** cada uno (en código)
+- [x] Runner: form enums, `--mode acb`, `--allow-fallback`, exit code por `--max-error-rate`, `STRESS_MARKER` + recall
+- [x] `build_report.py`, tests runner/compresión/recall (90 tests)
+- [x] README actualizado (reproducir stress + build_report)
+- [ ] `evals/stress.run` corrida completa sin errores dominantes
+- [ ] `results.csv` con matriz completa (~900 filas, 20 turnos) y cabecera
+- [ ] `REPORT.md` regenerado tras CSV final (afirmaciones con turno 12/20)
 
 ---
 

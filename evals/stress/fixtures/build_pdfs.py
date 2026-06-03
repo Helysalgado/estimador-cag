@@ -7,6 +7,7 @@ from pathlib import Path
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from evals.stress.schema import STRESS_MARKER
 
 TARGET_KB = [5, 20, 50, 100]
 
@@ -14,7 +15,10 @@ TARGET_KB = [5, 20, 50, 100]
 def _write_pdf(path: Path, target_kb: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     target_bytes = target_kb * 1024
-    line = "Synthetic stress attachment. Lorem ipsum for deterministic PDF fixture."
+    line = (
+        f"Synthetic stress attachment. {STRESS_MARKER} "
+        "Lorem ipsum for deterministic PDF fixture."
+    )
     line_count = max(80, target_kb * 60)
     while True:
         c = canvas.Canvas(str(path), pagesize=A4)
