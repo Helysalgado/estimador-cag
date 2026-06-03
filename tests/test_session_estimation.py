@@ -6,7 +6,7 @@ from app.services.session_estimation import (
     estimate_session_turn,
     update_metadata_from_turn,
 )
-from app.services.sessions import ProjectMetadata, Session
+from app.services.sessions import ConversationHistory, ProjectMetadata, Session
 
 
 def test_update_metadata_extracts_technologies_and_project_name():
@@ -115,3 +115,32 @@ def test_second_turn_includes_prior_history_in_messages(monkeypatch):
     assert roles == ["system", "user", "assistant", "user"]
     assert captured[0][1]["content"] == "first user"
     assert captured[0][-1]["content"] == "second user question"
+
+
+def test_completed_turn_count_exceeds_sliding_window(monkeypatch):
+    """Stress CSV uses turn_index = completed turns, not window size."""
+    session = Session(session_id="stress-counter", history=ConversationHistory(max_turns=2))
+
+    def fake_generate_sync_messages(*, messages, config):  # noqa: ANN001, ARG001
+        return {"estimation": "ok"}
+
+    monkeypatch.setattr(
+        "app.services.session_estimation.generate_sync_messages",
+        fake_generate_sync_messages,
+    )
+    monkeypatch.setattr(
+        "app.services.session_estimation.render_session_system_prompt",
+        lambda **kwargs: "SYSTEM",
+    )
+    monkeypatch.setattr(
+        "app.services.session_estimation.extract_project_metadata_update",
+        lambda **kwargs: ProjectMetadata(),
+    )
+
+    for index in range(4):
+        response = estimate_session_turn(session, f"user turn {index}")
+        assert response.observation is not None
+        assert response.observation.turn_index == index + 1
+
+    assert session.history.turn_count == 2
+    assert session.completed_turn_count == 4

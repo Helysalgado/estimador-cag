@@ -167,10 +167,11 @@ def estimate_session_turn(
         session_id=session.session_id,
         prompt_version=prompt_version,
         history_turns=session.history.turn_count,
+        completed_turns=session.completed_turn_count,
         metadata_populated=session.metadata.has_content(),
     )
     observation = TurnObservation(
-        turn_index=session.history.turn_count,
+        turn_index=session.completed_turn_count,
         session_id=session.session_id,
         enriched_transcript_chars=len(user_turn),
         attachments_total_chars=attachments_total_chars,
@@ -190,7 +191,7 @@ def estimate_session_turn(
     return SessionEstimationResponse(
         text=assistant_text,
         prompt_version=prompt_version,
-        turn_count=session.history.turn_count,
+        turn_count=session.completed_turn_count,
         tier=tier,
         tier_rule=rule,
         project_metadata=ProjectMetadataView.model_validate(session.metadata),
@@ -229,7 +230,7 @@ def estimate_session_turn_acb(
     return ACBResponse(
         text=candidate_text,
         prompt_version=prompt_version,
-        turn_count=session.history.turn_count,
+        turn_count=session.completed_turn_count,
         tier=session.last_resolved_tier,
         tier_rule=session.last_tier_rule,
         project_metadata=ProjectMetadataView.model_validate(session.metadata),

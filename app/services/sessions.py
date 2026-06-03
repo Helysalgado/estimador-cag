@@ -130,6 +130,7 @@ class Session:
     last_resolved_tier: str = "default"
     last_tier_rule: str = "default_rule"
     last_turn_observed: dict[str, object] | None = None
+    completed_turn_count: int = 0
     created_at: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc),
     )
@@ -137,6 +138,7 @@ class Session:
     def add_turn(self, user_content: str, assistant_content: str) -> None:
         """Append a turn and run compression on evicted history."""
         self.history.add_turn(user_content, assistant_content)
+        self.completed_turn_count += 1
         evicted_pairs = self.history.consume_evicted_pairs()
         if not evicted_pairs:
             return

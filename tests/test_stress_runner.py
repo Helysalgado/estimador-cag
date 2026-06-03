@@ -104,10 +104,11 @@ def test_runner_writes_csv_with_expected_columns(client, stress_llm_stub, tmp_pa
     with csv_path.open(encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 3
+    turn_indices = [int(row["turn_index"]) for row in rows]
+    assert turn_indices == [1, 2, 3]
     for row in rows:
         assert row["scenario"] == "growing"
         assert row["error"] == ""
-        assert int(row["turn_index"]) >= 1
         assert int(row["tokens_in"]) > 0
     assert rows[0]["memory_drift_passed"] == ""
     assert rows[1]["memory_drift_passed"] in {"True", "False"}

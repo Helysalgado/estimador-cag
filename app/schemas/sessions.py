@@ -55,7 +55,7 @@ class SessionEstimationResponse(BaseModel):
 
     text: str = Field(description="Estimation rendered by the LLM as free text.")
     prompt_version: str = Field(description="Jinja template version used for this turn.")
-    turn_count: int = Field(ge=0, description="Completed user/assistant pairs in memory.")
+    turn_count: int = Field(ge=0, description="Total completed user/assistant pairs in the session.")
     tier: str = Field(default="default", description="Tier resolved for this response.")
     tier_rule: str = Field(default="default_rule", description="Rule used to resolve tier.")
     project_metadata: ProjectMetadataView

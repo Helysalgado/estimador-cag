@@ -117,6 +117,7 @@ def test_sliding_window_keeps_at_most_max_turns_after_eight_requests(
     session = session_store.get(session_id)
     assert session is not None
     assert session.history.turn_count == max_turns
+    assert session.completed_turn_count == 8
 
     stored_users = [
         message.content

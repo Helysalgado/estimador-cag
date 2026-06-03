@@ -9,14 +9,26 @@ from app.services.llm_wrapper import WrapperConfig, generate_sync_messages
 from app.services.sessions import ProjectMetadata
 
 
+def _coerce_optional_str(value: object, *, max_len: int = 300) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        text = ", ".join(str(item) for item in value if item)
+    else:
+        text = str(value).strip()
+    if not text:
+        return None
+    return text[:max_len] + ("…" if len(text) > max_len else "")
+
+
 def merge_metadata(existing: ProjectMetadata, update: ProjectMetadata) -> ProjectMetadata:
     """Merge sparse updates into existing metadata."""
     if update.project_name:
-        existing.project_name = update.project_name
+        existing.project_name = str(update.project_name)
     if update.assumed_team_size is not None:
         existing.assumed_team_size = update.assumed_team_size
     if update.agreed_scope:
-        existing.agreed_scope = update.agreed_scope
+        existing.agreed_scope = _coerce_optional_str(update.agreed_scope) or existing.agreed_scope
     for item in update.mentioned_technologies:
         if item not in existing.mentioned_technologies:
             existing.mentioned_technologies.append(item)
@@ -60,10 +72,10 @@ def _extract_with_llm(user_turn: str, assistant_text: str, config: WrapperConfig
     except Exception:
         return ProjectMetadata()
     return ProjectMetadata(
-        project_name=payload.get("project_name"),
+        project_name=_coerce_optional_str(payload.get("project_name"), max_len=64),
         assumed_team_size=payload.get("assumed_team_size"),
         mentioned_technologies=list(payload.get("mentioned_technologies") or []),
-        agreed_scope=payload.get("agreed_scope"),
+        agreed_scope=_coerce_optional_str(payload.get("agreed_scope")),
         explicit_constraints=list(payload.get("explicit_constraints") or []),
         rejected_options=list(payload.get("rejected_options") or []),
     )
