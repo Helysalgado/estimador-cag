@@ -265,6 +265,17 @@ docker compose exec api python scripts/compare.py \
 
 Requiere `OPENAI_API_KEY`. Plan e informe de cumplimiento: [`docs/plans/session-07/`](docs/plans/session-07/README.md).
 
+### Benchmark OpenAI vs modelo local (opcional, sesión en vivo)
+
+Compara latencia y dimensiones entre `text-embedding-3-small` (1536 y 256 dims) y MiniLM local. **No** forma parte del entregable S7; requiere dependencias extra (PyTorch vía `sentence-transformers`).
+
+```bash
+uv sync --extra dev --extra benchmark
+uv run python app/embedding_pipeline/embedding_benchmark.py
+```
+
+Salida ejemplo: dicts con `model`, `total_seconds`, `per_text_ms`, `dimensions`. Solo local con `uv run`; no está en la imagen Docker `api`.
+
 ---
 
 ## Adjuntos: Camino B (extracción local)
@@ -364,6 +375,7 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_embedder.py` | Batching y reintentos del embedder (mock) |
 | `tests/test_embeddings_router.py` | `POST /api/v1/embeddings/ingest` |
 | `tests/test_similarity.py` | Similitud coseno (stdlib) |
+| `tests/test_embedding_benchmark.py` | Harness de benchmark (mock, sin red) |
 
 Los tests de embeddings **no** llaman a OpenAI; el sanity check manual sí (ver `SANITY_CHECK.md`).
 
@@ -431,6 +443,7 @@ estimador-cag/
 │   │   ├── router.py
 │   │   ├── schemas.py
 │   │   ├── similarity.py
+│   │   ├── embedding_benchmark.py  # Lab: OpenAI vs MiniLM (extra benchmark)
 │   │   └── SANITY_CHECK.md
 │   ├── schemas/
 │   │   ├── estimation.py
