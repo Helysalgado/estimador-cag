@@ -8,6 +8,10 @@
 - Sesión 5 (memoria conversacional + adjuntos):
   - **[`plans/session-05/`](./plans/session-05/README.md)**
 
+- Sesión 6 (stress CAG + observabilidad por turno):
+  - **[`plans/session-06/`](./plans/session-06/README.md)** — bitácora de implementación
+  - **[`plans/session-06/GAP-ANALISIS.md`](./plans/session-06/GAP-ANALISIS.md)** — cumplimiento vs material y pendientes
+
 ## Texto de entrada de ejemplo
 
 - **`transcripcion-reunion.md`**: reunión ficticia con un cliente. Puedes pegar su contenido en el campo **`description`** del formulario Streamlit o del body JSON del API (mínimo 20 caracteres, máximo 80.000).
