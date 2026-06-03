@@ -358,6 +358,8 @@ Artefactos generados:
 
 Coste orientativo de la corrida completa: ~900 llamadas LLM (3 escenarios × 5 tamaños × 3 repeticiones × 20 turnos). Para validar el pipeline antes, usa un solo escenario y `--repeats 1`.
 
+Si el repo está en Google Drive y ves `TimeoutError` al escribir el CSV, el runner guarda primero en `/tmp` y copia al final; también puedes usar `--output /tmp/results.csv`.
+
 ```bash
 uv run python scripts/validate_structure.py
 ```

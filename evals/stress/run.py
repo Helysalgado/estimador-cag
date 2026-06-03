@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import shutil
 import sys
+import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -37,9 +39,22 @@ def _parse_int_list(value: str) -> list[int]:
 
 
 @contextmanager
+def _csv_output(path: Path) -> Iterator[Any]:
+    """Write CSV to a local temp file, then copy once (avoids GDrive flush timeouts)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(tempfile.mkstemp(prefix="stress_", suffix=".csv")[1])
+    try:
+        with tmp.open("w", newline="", encoding="utf-8") as handle:
+            yield handle
+        shutil.copyfile(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@contextmanager
 def _open_client(http_base_url: str | None) -> Iterator[httpx.Client | Any]:
     if http_base_url:
-        with httpx.Client(base_url=http_base_url, timeout=180.0) as client:
+        with httpx.Client(base_url=http_base_url, timeout=300.0) as client:
             yield client
         return
 
@@ -334,7 +349,7 @@ def main() -> int:
     total_rows = 0
     total_errors = 0
     t_start = time.perf_counter()
-    with args.output.open("w", newline="", encoding="utf-8") as handle:
+    with _csv_output(args.output) as handle:
         writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
         writer.writeheader()
         with _open_client(args.http) as client:
@@ -359,7 +374,6 @@ def main() -> int:
                         )
                         total_rows += written
                         total_errors += errors
-                        handle.flush()
 
     elapsed_s = int(time.perf_counter() - t_start)
     print(f"\nWrote {total_rows} rows to {args.output} in {elapsed_s}s ({total_errors} error rows)")
