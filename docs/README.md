@@ -15,6 +15,10 @@
   - **[`plans/session-06/GAP-ANALISIS.md`](./plans/session-06/GAP-ANALISIS.md)** — cumplimiento vs material
   - **[`plans/session-06/PLAN-IMPLEMENTACION.md`](./plans/session-06/PLAN-IMPLEMENTACION.md)** — qué falta implementar (vs LIDR S6)
 
+- Sesión 7 (embeddings + chunking estructural):
+  - **[`plans/session-07/`](./plans/session-07/README.md)** — índice
+  - **[`plans/session-07/PLAN-IMPLEMENTACION.md`](./plans/session-07/PLAN-IMPLEMENTACION.md)** — plan detallado (material `mat-sesion7.md`)
+
 ## Texto de entrada de ejemplo
 
 - **`transcripcion-reunion.md`**: reunión ficticia con un cliente. Puedes pegar su contenido en el campo **`description`** del formulario Streamlit o del body JSON del API (mínimo 20 caracteres, máximo 80.000).
