@@ -16,11 +16,12 @@ Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y 
 |------|----------------|-------------------|
 | **Formulario (Sesión 4)** | Una petición, una estimación completa con enums tipados | `POST /api/v1/estimate` |
 | **Conversación (Sesión 5)** | Varios turnos en la misma sesión, con memoria y adjuntos | `POST /api/v1/sessions/{id}/estimate` |
-| **Embeddings (Sesión 7)** | Presupuestos JSON → chunks → vectores (en memoria, sin pgvector) | `POST /api/v1/embeddings/ingest` (alias: `POST /embeddings/ingest`) |
+| **Embeddings (Sesión 7)** | Similitud par-a-par y sanity check (`compare.py`) | `scripts/compare.py` |
+| **pgvector (Sesión 8)** | Ingesta persistida + búsqueda semántica top-k | `POST /api/v1/embeddings/ingest`, `POST /api/v1/search` |
 
 El cliente **Streamlit** cubre formulario y conversación en pestañas; el pipeline de embeddings se consume por HTTP (curl, Swagger u otro backend).
 
-Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md).
+Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md).
 
 ## Requisitos
 
@@ -222,28 +223,9 @@ El endpoint **stateless** `POST /api/v1/estimate` sigue disponible y no comparte
 
 ---
 
-## Modo 3 — Pipeline de embeddings (Sesión 7)
+## Modo 3 — Similitud de embeddings (Sesión 7)
 
-Presupuestos históricos en JSON → chunking estructural (1 componente = 1 chunk) → embeddings OpenAI `text-embedding-3-small`. Los vectores se devuelven en la respuesta HTTP; no hay persistencia en base vectorial (eso es Sesión 8).
-
-Datos de ejemplo: [`data/budgets_sample.json`](data/budgets_sample.json) (15 presupuestos). Sanity check de similitud: [`app/embedding_pipeline/SANITY_CHECK.md`](app/embedding_pipeline/SANITY_CHECK.md).
-
-### Ingest (API)
-
-```bash
-# Con la API en marcha (uvicorn :8000)
-jq -n --slurpfile b data/budgets_sample.json '{budgets: $b[0]}' \
-  | curl -s -X POST http://localhost:8000/api/v1/embeddings/ingest \
-      -H "Content-Type: application/json" \
-      -d @- \
-  | jq '{stats, chunk_count: (.chunks | length), first_chunk_id: .chunks[0].chunk_id}'
-```
-
-También puedes probar el body desde Swagger: `http://localhost:8000/docs` → **embeddings** → `POST /api/v1/embeddings/ingest` (misma operación en `POST /embeddings/ingest`, alias del material).
-
-Tras `docker compose build api`, el contenedor incluye `scripts/compare.py` y `data/budgets_sample.json` en `/app`.
-
-Respuesta: `chunks[]` (cada uno con `embedding` de 1536 dimensiones) y `stats` (`total_budgets`, `total_chunks`, `total_tokens`, `estimated_cost_usd`).
+Chunking estructural y embeddings OpenAI `text-embedding-3-small` (ver Modo 4 para persistencia). Datos de ejemplo: [`data/budgets_sample.json`](data/budgets_sample.json). Sanity check: [`app/embedding_pipeline/SANITY_CHECK.md`](app/embedding_pipeline/SANITY_CHECK.md).
 
 ### Comparar dos textos (CLI)
 
@@ -255,26 +237,73 @@ uv run python scripts/compare.py \
   --text-b "JWT-based authorization service for banking app"
 ```
 
-Dentro de Docker Compose (servicio `api`):
+Dentro de Docker Compose (servicio `ai_service`):
 
 ```bash
-docker compose exec api python scripts/compare.py \
+docker compose exec ai_service python scripts/compare.py \
   --text-a "OAuth 2.0 authentication backend for fintech" \
   --text-b "JWT-based authorization service for banking app"
 ```
 
-Requiere `OPENAI_API_KEY`. Plan e informe de cumplimiento: [`docs/plans/session-07/`](docs/plans/session-07/README.md).
+Requiere `OPENAI_API_KEY`. Plan S7: [`docs/plans/session-07/`](docs/plans/session-07/README.md).
 
-### Benchmark OpenAI vs modelo local (opcional, sesión en vivo)
+---
 
-Compara latencia y dimensiones entre `text-embedding-3-small` (1536 y 256 dims) y MiniLM local. **No** forma parte del entregable S7; requiere dependencias extra (PyTorch vía `sentence-transformers`).
+## Modo 4 — pgvector + búsqueda semántica (Sesión 8)
+
+Presupuestos JSON → chunk + embed → **PostgreSQL + pgvector** (`documents` + `chunks`) → búsqueda top-k por distancia coseno.
+
+### Levantar stack y migrar
 
 ```bash
-uv sync --extra dev --extra benchmark
-uv run python app/embedding_pipeline/embedding_benchmark.py
+docker compose up -d postgres ai_service
+docker compose run --rm ai_service alembic upgrade head
 ```
 
-Salida ejemplo: dicts con `model`, `total_seconds`, `per_text_ms`, `dimensions`. Solo local con `uv run`; no está en la imagen Docker `api`.
+### Ingest (un presupuesto por request)
+
+```bash
+jq '{
+  source_path: ("data/budgets/" + .[0].budget_id + ".json"),
+  document_type: "historical_budget",
+  content: .[0]
+}' data/budgets_sample.json \
+  | curl -s -X POST http://localhost:8000/api/v1/embeddings/ingest \
+      -H "Content-Type: application/json" -d @-
+```
+
+Respuesta: `document_id`, `chunks_created`, `embedding_dimension`, `ingestion_time_ms`. Duplicado por `source_path` → **409**.
+
+### Poblar corpus de ejemplo (15 presupuestos)
+
+```bash
+docker compose run --rm ai_service python scripts/ingest_sample_corpus.py
+```
+
+### Búsqueda semántica
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "REST API with OAuth authentication for fintech sector", "k": 5}' | jq
+```
+
+Alias del material: `POST /embeddings/ingest`, `POST /search`.
+
+### Queries de ejemplo
+
+```bash
+docker compose run --rm ai_service python scripts/query_examples.py | tee output_examples.txt
+```
+
+### Decisiones de schema (resumen)
+
+- **Dos tablas (`documents` + `chunks`):** un presupuesto genera N chunks; la FK con `ON DELETE CASCADE` mantiene integridad sin duplicar metadata del documento en cada fila.
+- **`metadata` JSONB:** campos estables en columnas tipadas; tags, scope y enriquecimiento del chunker van en JSONB sin migrar el schema cada vez (índice GIN preparado para filtros futuros).
+- **`cosine_distance`:** embeddings OpenAI normalizados; alinea con el índice HNSW `vector_cosine_ops` que se añade en la sesión en vivo.
+- **Sin índice vectorial (por ahora):** sequential scan como baseline para medir el impacto del índice en directo.
+
+Plan S8: [`docs/plans/session-08/`](docs/plans/session-08/README.md). Rama: **`pre-session-08`**.
 
 ---
 
@@ -373,7 +402,8 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_embedding_schemas.py` | Schemas de presupuestos/chunks |
 | `tests/test_chunker.py` | Chunker estructural JSON |
 | `tests/test_embedder.py` | Batching y reintentos del embedder (mock) |
-| `tests/test_embeddings_router.py` | `POST /api/v1/embeddings/ingest` |
+| `tests/test_embeddings_router.py` | `POST /api/v1/embeddings/ingest` (persist) |
+| `tests/test_search_router.py` | `POST /api/v1/search` |
 | `tests/test_similarity.py` | Similitud coseno (stdlib) |
 | `tests/test_embedding_benchmark.py` | Harness de benchmark (mock, sin red) |
 
