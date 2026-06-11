@@ -1,23 +1,58 @@
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 from openai import RateLimitError
 
+from app.db.session import get_db_session
 from app.embedding_pipeline.embedder import EmbedManyResult
 from app.embedding_pipeline.schemas import EmbeddedChunk
+from app.main import app
 
 
-def _one_budget_payload() -> dict:
+def _one_budget() -> dict:
     budgets = json.loads(Path("data/budgets_sample.json").read_text(encoding="utf-8"))
-    return {"budgets": [budgets[0]]}
+    return budgets[0]
 
 
-def test_ingest_returns_chunks_and_stats(
-    client: TestClient,
+def _persist_payload() -> dict:
+    budget = _one_budget()
+    return {
+        "source_path": f"data/budgets/{budget['budget_id']}.json",
+        "document_type": "historical_budget",
+        "content": budget,
+    }
+
+
+@pytest.fixture
+def mock_session() -> AsyncMock:
+    session = AsyncMock()
+    session.scalar = AsyncMock(return_value=None)
+    session.flush = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session.add = MagicMock()
+    session.add_all = MagicMock()
+    return session
+
+
+@pytest.fixture
+def client_with_db(mock_session: AsyncMock) -> TestClient:
+    async def _override_session():
+        yield mock_session
+
+    app.dependency_overrides[get_db_session] = _override_session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+def test_ingest_persists_and_returns_metrics(
+    client_with_db: TestClient,
+    mock_session: AsyncMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -32,39 +67,53 @@ def test_ingest_returns_chunks_and_stats(
                 text=chunk.text,
                 metadata=chunk.metadata,
                 token_count=chunk.token_count,
-                embedding=[0.1, 0.2, 0.3],
+                embedding=[0.1] * 1536,
             )
             for chunk in chunks
         ]
-        total_tokens = sum(c.token_count for c in chunks)
-        return EmbedManyResult(chunks=embedded, total_tokens=total_tokens)
+        return EmbedManyResult(chunks=embedded, total_tokens=sum(c.token_count for c in chunks))
 
     monkeypatch.setattr(
         "app.embedding_pipeline.router.OpenAIEmbedder.embed_many",
         fake_embed_many,
     )
 
-    payload = _one_budget_payload()
-    response = client.post("/api/v1/embeddings/ingest", json=payload)
-    legacy = client.post("/embeddings/ingest", json=payload)
+    def assign_document_id(document):
+        document.id = 42
+
+    mock_session.add.side_effect = assign_document_id
+
+    payload = _persist_payload()
+    response = client_with_db.post("/api/v1/embeddings/ingest", json=payload)
+    legacy = client_with_db.post("/embeddings/ingest", json=payload)
 
     assert response.status_code == 200
     assert legacy.status_code == 200
-    assert legacy.json()["stats"] == response.json()["stats"]
     body = response.json()
-    assert len(body["chunks"]) == 3
-    assert body["chunks"][0]["chunk_id"] == "BUD-2024-014::AUTH-001"
-    assert body["chunks"][0]["embedding"] == [0.1, 0.2, 0.3]
-    assert body["stats"] == {
-        "total_budgets": 1,
-        "total_chunks": 3,
-        "total_tokens": 126,
-        "estimated_cost_usd": pytest.approx(126 / 1_000_000 * 0.02),
+    assert body["document_id"] == 42
+    assert body["chunks_created"] == 3
+    assert body["embedding_dimension"] == 1536
+    assert body["ingestion_time_ms"] >= 0
+    assert mock_session.commit.await_count == 2
+
+
+def test_ingest_duplicate_returns_409(
+    client_with_db: TestClient,
+    mock_session: AsyncMock,
+) -> None:
+    mock_session.scalar = AsyncMock(return_value=SimpleNamespace(id=99))
+
+    response = client_with_db.post("/api/v1/embeddings/ingest", json=_persist_payload())
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Document already ingested",
+        "document_id": 99,
     }
 
 
 def test_ingest_openai_error_returns_500(
-    client: TestClient,
+    client_with_db: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -80,12 +129,15 @@ def test_ingest_openai_error_returns_500(
         fail_embed_many,
     )
 
-    response = client.post("/api/v1/embeddings/ingest", json=_one_budget_payload())
+    response = client_with_db.post("/api/v1/embeddings/ingest", json=_persist_payload())
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Embedding service failed. Please try again later."
 
 
 def test_ingest_validation_error_returns_422(client: TestClient) -> None:
-    response = client.post("/api/v1/embeddings/ingest", json={"budgets": []})
+    response = client.post(
+        "/api/v1/embeddings/ingest",
+        json={"source_path": "", "document_type": "historical_budget", "content": {}},
+    )
     assert response.status_code == 422
