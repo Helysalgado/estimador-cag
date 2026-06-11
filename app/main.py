@@ -3,9 +3,12 @@ import logging
 
 import structlog
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.db.session import dispose_engine
 from app.embedding_pipeline import router as embeddings_router
+from app.embedding_pipeline.errors import DuplicateDocumentError
 from app.routers import estimations, sessions
 
 
@@ -29,6 +32,7 @@ async def lifespan(app: FastAPI):
         cache_logger_on_first_use=True,
     )
     yield
+    await dispose_engine()
 
 
 app = FastAPI(
@@ -42,6 +46,17 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(DuplicateDocumentError)
+async def duplicate_document_handler(_request, exc: DuplicateDocumentError):
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": "Document already ingested",
+            "document_id": exc.document_id,
+        },
+    )
+
+
 # -------------------------
 # Routers
 # -------------------------
@@ -50,6 +65,8 @@ app.include_router(estimations.router)
 app.include_router(sessions.router)
 app.include_router(embeddings_router.router)
 app.include_router(embeddings_router.material_router)
+app.include_router(embeddings_router.search_router)
+app.include_router(embeddings_router.material_search_router)
 
 
 # -------------------------
