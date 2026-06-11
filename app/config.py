@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     MAX_ATTACHMENTS_PER_REQUEST: int = 5
     APP_ENV: str = "development"
     LOG_LEVEL: str = "DEBUG"
+    DATABASE_URL: str = "postgresql+asyncpg://estimator:estimator@localhost:5432/estimator"
 
     class Config:
         env_file = ".env"

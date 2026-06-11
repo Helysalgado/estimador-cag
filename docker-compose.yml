@@ -6,10 +6,29 @@ services:
     volumes:
       - redis_data:/data
 
-  api:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: estimator
+      POSTGRES_USER: estimator
+      POSTGRES_PASSWORD: estimator
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U estimator -d estimator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ai_service:
     build: .
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
     environment:
@@ -17,6 +36,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-86400}
+      DATABASE_URL: postgresql+asyncpg://estimator:estimator@postgres:5432/estimator
 
 volumes:
   redis_data:
+  postgres_data:
