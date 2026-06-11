@@ -257,7 +257,7 @@ Presupuestos JSON → chunk + embed → **PostgreSQL + pgvector** (`documents` +
 
 ```bash
 docker compose up -d postgres ai_service
-docker compose run --rm ai_service alembic upgrade head
+docker compose exec ai_service uv run alembic upgrade head
 ```
 
 ### Ingest (un presupuesto por request)
@@ -277,7 +277,7 @@ Respuesta: `document_id`, `chunks_created`, `embedding_dimension`, `ingestion_ti
 ### Poblar corpus de ejemplo (15 presupuestos)
 
 ```bash
-docker compose run --rm ai_service python scripts/ingest_sample_corpus.py
+docker compose exec ai_service uv run python scripts/ingest_sample_corpus.py
 ```
 
 ### Búsqueda semántica
@@ -293,7 +293,7 @@ Alias del material: `POST /embeddings/ingest`, `POST /search`.
 ### Queries de ejemplo
 
 ```bash
-docker compose run --rm ai_service python scripts/query_examples.py | tee output_examples.txt
+docker compose exec ai_service uv run python scripts/query_examples.py | tee output_examples.txt
 ```
 
 ### Decisiones de schema (resumen)

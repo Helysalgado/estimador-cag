@@ -18,7 +18,7 @@ Complementa [`PLAN-IMPLEMENTACION.md`](./PLAN-IMPLEMENTACION.md) y el [`README`]
 | `POST /search` con `cosine_distance` | **Cumple** |
 | `scripts/query_examples.py` | **Cumple** |
 | `scripts/ingest_sample_corpus.py` | **Cumple** (auxiliar) |
-| `output_examples.txt` | **Pendiente ejecución** — placeholder hasta `docker compose` + OpenAI |
+| `output_examples.txt` | **Cumple** — generado contra corpus de 15 presupuestos |
 | README justificaciones schema | **Cumple** — Modo 4 |
 | Pipeline S7 (chunker, embedder, sample) | **Cumple** — reutilizado |
 | Servicio Docker `ai_service` | **Cumple** |
@@ -118,7 +118,7 @@ Complementa [`PLAN-IMPLEMENTACION.md`](./PLAN-IMPLEMENTACION.md) y el [`README`]
 - [x] `POST /embeddings/ingest` y `/api/v1/embeddings/ingest` persistiendo
 - [x] `POST /search` y `/api/v1/search` funcional
 - [x] `scripts/query_examples.py`
-- [ ] `output_examples.txt` (generar con Docker en marcha)
+- [x] `output_examples.txt`
 - [x] README Modo 4 (justificaciones schema)
 - [x] Rama **`pre-session-08`**
 

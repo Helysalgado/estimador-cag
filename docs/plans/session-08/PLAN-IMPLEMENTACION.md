@@ -386,9 +386,9 @@ stmt = (
 
 ```bash
 docker compose up -d
-docker compose run --rm ai_service alembic upgrade head
-docker compose run --rm ai_service python scripts/ingest_sample_corpus.py
-docker compose run --rm ai_service python scripts/query_examples.py | tee output_examples.txt
+docker compose exec ai_service uv run alembic upgrade head
+docker compose exec ai_service uv run python scripts/ingest_sample_corpus.py
+docker compose exec ai_service uv run python scripts/query_examples.py | tee output_examples.txt
 ```
 
 **Checkpoint:** `output_examples.txt` con resultados legibles de 5 queries × top-5.
