@@ -1,0 +1,6 @@
+# Pending: run with Docker + OPENAI_API_KEY
+#
+# docker compose up -d
+# docker compose run --rm ai_service alembic upgrade head
+# docker compose run --rm ai_service python scripts/ingest_sample_corpus.py
+# docker compose run --rm ai_service python scripts/query_examples.py > output_examples.txt
