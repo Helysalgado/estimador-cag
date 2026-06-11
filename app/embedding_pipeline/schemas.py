@@ -77,3 +77,42 @@ class IngestRequest(BaseModel):
 class IngestResponse(BaseModel):
     chunks: list[EmbeddedChunk]
     stats: IngestStats
+
+
+class PersistIngestRequest(BaseModel):
+    source_path: str = Field(min_length=1)
+    document_type: str = Field(min_length=1)
+    content: Budget
+
+
+class PersistIngestResponse(BaseModel):
+    document_id: int = Field(ge=1)
+    chunks_created: int = Field(ge=0)
+    embedding_dimension: int = Field(ge=1)
+    ingestion_time_ms: int = Field(ge=0)
+
+
+class DuplicateDocumentDetail(BaseModel):
+    detail: str
+    document_id: int
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(min_length=1)
+    k: int = Field(default=5, ge=1, le=100)
+
+
+class SearchResultItem(BaseModel):
+    chunk_id: int
+    document_id: int
+    chunk_type: str
+    content: str
+    distance: float
+    metadata: dict
+
+
+class SearchResponse(BaseModel):
+    query: str
+    k: int
+    search_time_ms: int
+    results: list[SearchResultItem]

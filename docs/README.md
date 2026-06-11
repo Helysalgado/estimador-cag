@@ -20,6 +20,11 @@
   - **[`plans/session-07/PLAN-IMPLEMENTACION.md`](./plans/session-07/PLAN-IMPLEMENTACION.md)** — plan detallado (material `mat-sesion7.md`)
   - **[`plans/session-07/GAP-ANALISIS.md`](./plans/session-07/GAP-ANALISIS.md)** — cumplimiento vs material
 
+- Sesión 8 (pgvector + búsqueda semántica):
+  - **[`plans/session-08/`](./plans/session-08/README.md)** — índice pre-ejercicio
+  - **[`plans/session-08/PLAN-IMPLEMENTACION.md`](./plans/session-08/PLAN-IMPLEMENTACION.md)** — plan detallado (material `sesion8.md`)
+  - **[`plans/session-08/GAP-ANALISIS.md`](./plans/session-08/GAP-ANALISIS.md)** — cumplimiento vs material
+
 ## Texto de entrada de ejemplo
 
 - **`transcripcion-reunion.md`**: reunión ficticia con un cliente. Puedes pegar su contenido en el campo **`description`** del formulario Streamlit o del body JSON del API (mínimo 20 caracteres, máximo 80.000).
