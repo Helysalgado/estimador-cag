@@ -1,23 +1,66 @@
-# schemas/estimation.py
+"""Request and response models for the estimation endpoint.
+
+Session 4 contract: typed form-style request (description plus three enums)
+maps to a free-text response with the prompt version that produced it.
+"""
+
+from enum import Enum
+
 from pydantic import BaseModel, Field
 
 
-# -------------------------
-# Schemas
-# -------------------------
+class ProjectType(str, Enum):
+    MOBILE_APP = "mobile_app"
+    WEB_SAAS = "web_saas"
+    INTERNAL_TOOL = "internal_tool"
+    DATA_PIPELINE = "data_pipeline"
+
+
+class DetailLevel(str, Enum):
+    SUMMARY = "summary"
+    MEDIUM = "medium"
+    DETAILED = "detailed"
+
+
+class OutputFormat(str, Enum):
+    PHASES_TABLE = "phases_table"
+    LINE_ITEMS = "line_items"
+    NARRATIVE = "narrative"
+
+
+class ReferenceProject(BaseModel):
+    """Optional similar project the model may use as loose scope context."""
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=2000)
+    estimated_weeks: int | None = Field(
+        default=None,
+        ge=1,
+        le=520,
+        description="Optional indicative duration of the reference project in weeks.",
+    )
+
 
 class EstimationRequest(BaseModel):
-    transcription: str = Field(
-        ...,
-        min_length=50,
-        description="Transcripción de la reunión con el cliente"
+    """Typed payload sent by the business backend or Streamlit form."""
+
+    description: str = Field(
+        min_length=20,
+        max_length=80000,
+        description="Free-text description or transcription of the project to estimate.",
+    )
+    project_type: ProjectType = Field(description="Coarse-grained project category.")
+    detail_level: DetailLevel = Field(description="How deep the estimation should go.")
+    output_format: OutputFormat = Field(description="Shape of the rendered estimation.")
+    reference_projects: list[ReferenceProject] | None = Field(
+        default=None,
+        max_length=10,
+        description="Optional list of similar projects for the prompt context block.",
     )
 
 
 class EstimationResponse(BaseModel):
-    estimation: str
-    model: str
-    provider: str
-    timestamp: str
+    """Estimation rendered as free text, plus the prompt version that produced it."""
 
-
+    text: str = Field(description="Estimation rendered by the LLM as free text.")
+    prompt_version: str = Field(description="Identifier of the prompt template used.")

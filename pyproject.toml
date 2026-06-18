@@ -1,24 +1,41 @@
 [project]
 name = "estimador-cag"
 version = "0.1.0"
-description = "API de estimación de software con CAG (OpenAI)"
+description = "API de estimación de software con formulario tipado y prompts Jinja2 versionados"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.50.0",
     "fastapi>=0.136.1",
+    "litellm>=1.79.0",
     "lru-cache>=0.2.3",
     "openai>=2.33.0",
+    "tiktoken>=0.7.0",
     "pydantic-settings>=2.14.0",
+    "redis>=6.0.0",
     "python-dotenv>=1.2.2",
+    "httpx>=0.28.0",
     "streamlit>=1.45.0",
     "uvicorn>=0.46.0",
+    "jinja2>=3.1",
+    "structlog>=24.0.0",
+    "python-multipart>=0.0.9",
+    "pypdf>=5.0.0",
+    "python-docx>=1.1.0",
+    "reportlab>=4.5.1",
+    "sqlalchemy>=2.0",
+    "greenlet>=3.0",
+    "asyncpg>=0.29",
+    "pgvector>=0.3",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "httpx>=0.28.0",
     "pytest>=8.0.0",
+]
+benchmark = [
+    "sentence-transformers>=3.0.0",
 ]
 
 [tool.pytest.ini_options]

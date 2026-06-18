@@ -1,0 +1,18 @@
+[
+  {"id":"g01","transcript":"Estimate a web SaaS CRM MVP for sales team.","must_include":["Discovery","Totals"],"min_cost":5000,"max_cost":200000},
+  {"id":"g02","transcript":"Mobile app for personal finance with savings goals.","must_include":["Implementation","QA"],"min_cost":5000,"max_cost":250000},
+  {"id":"g03","transcript":"Internal HR portal with SSO and approvals.","must_include":["Design","Launch"],"min_cost":5000,"max_cost":250000},
+  {"id":"g04","transcript":"Data pipeline to ingest events and build dashboards.","must_include":["phase","Totals"],"min_cost":5000,"max_cost":300000},
+  {"id":"g05","transcript":"Add billing with Stripe to existing product.","must_include":["Implementation"],"min_cost":2500,"max_cost":200000},
+  {"id":"g06","transcript":"Healthcare scheduling app with compliance constraints.","must_include":["Risks","confidence"],"min_cost":5000,"max_cost":350000},
+  {"id":"g07","transcript":"Marketplace backend API rewrite from monolith.","must_include":["Discovery","Implementation"],"min_cost":5000,"max_cost":400000},
+  {"id":"g08","transcript":"Inventory management app for warehouses.","must_include":["QA","Totals"],"min_cost":5000,"max_cost":250000},
+  {"id":"g09","transcript":"Customer support chatbot panel with analytics.","must_include":["Design","Implementation"],"min_cost":5000,"max_cost":250000},
+  {"id":"g10","transcript":"Finance reporting tool with role-based access.","must_include":["phase","Totals"],"min_cost":5000,"max_cost":300000},
+  {"id":"g11","transcript":"E-learning platform MVP with video and quizzes.","must_include":["Launch","Totals"],"min_cost":5000,"max_cost":300000},
+  {"id":"g12","transcript":"Construction project tracking dashboard.","must_include":["Discovery","Design"],"min_cost":5000,"max_cost":220000},
+  {"id":"g13","transcript":"Retail POS cloud sync and offline support.","must_include":["Implementation","Risks"],"min_cost":5000,"max_cost":350000},
+  {"id":"g14","transcript":"Insurance claims workflow digitization.","must_include":["phase","confidence"],"min_cost":5000,"max_cost":350000},
+  {"id":"g15","transcript":"Government document management portal.","must_include":["QA","Launch"],"min_cost":5000,"max_cost":500000},
+  {"id":"g16","transcript":"Booking engine for travel packages and payments.","must_include":["Totals","Implementation"],"min_cost":5000,"max_cost":350000}
+]
