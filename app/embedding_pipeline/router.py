@@ -1,4 +1,4 @@
-"""HTTP endpoints for budget embedding ingest and semantic search."""
+"""HTTP endpoints for budget embedding ingest and semantic / hybrid search."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from openai import OpenAIError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.db.models import (
     CHUNK_TYPE_BUDGET_COMPONENT,
     EMBEDDING_DIMENSION,
@@ -22,6 +23,7 @@ from app.db.session import get_db_session
 from app.embedding_pipeline.chunker import JSONStructuralChunker
 from app.embedding_pipeline.embedder import OpenAIEmbedder
 from app.embedding_pipeline.errors import DuplicateDocumentError
+from app.embedding_pipeline.retrieval.pipeline import retrieve
 from app.embedding_pipeline.schemas import (
     PersistIngestRequest,
     PersistIngestResponse,
@@ -104,12 +106,15 @@ async def _persist_ingest(
     )
 
 
-async def _semantic_search(
+async def _search(
     request: SearchRequest,
     session: AsyncSession,
 ) -> SearchResponse:
     started = time.perf_counter()
     embedder = OpenAIEmbedder()
+    effective_rerank = (
+        request.rerank if request.rerank is not None else settings.RERANKING_ENABLED
+    )
 
     try:
         query_vector = await asyncio.to_thread(embedder.embed_one, request.query)
@@ -120,36 +125,40 @@ async def _semantic_search(
             detail="Embedding service failed. Please try again later.",
         ) from exc
 
-    distance_expr = Chunk.embedding.cosine_distance(query_vector)
-    stmt = (
-        select(
-            Chunk.id,
-            Chunk.document_id,
-            Chunk.chunk_type,
-            Chunk.content,
-            Chunk.metadata_,
-            distance_expr.label("distance"),
+    try:
+        hits = await retrieve(
+            session,
+            query_text=request.query,
+            query_vector=query_vector,
+            search_mode=request.search_mode,
+            rerank=effective_rerank,
+            top_k=request.k,
+            candidate_pool_size=request.candidate_pool_size,
         )
-        .order_by(distance_expr)
-        .limit(request.k)
-    )
-    rows = (await session.execute(stmt)).all()
-    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    except Exception as exc:  # noqa: BLE001 — surface retrieval failures as 500
+        log.exception("retrieval_failed", error=str(exc))
+        raise HTTPException(
+            status_code=500,
+            detail="Retrieval failed. Please try again later.",
+        ) from exc
 
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
     return SearchResponse(
         query=request.query,
         k=request.k,
         search_time_ms=elapsed_ms,
+        search_mode=request.search_mode,
+        rerank=effective_rerank,
         results=[
             SearchResultItem(
-                chunk_id=row.id,
-                document_id=row.document_id,
-                chunk_type=row.chunk_type,
-                content=row.content,
-                distance=round(float(row.distance), 4),
-                metadata=row.metadata_ or {},
+                chunk_id=hit.chunk_id,
+                document_id=hit.document_id,
+                chunk_type=hit.chunk_type,
+                content=hit.content,
+                distance=round(float(hit.distance), 4),
+                metadata=hit.metadata,
             )
-            for row in rows
+            for hit in hits
         ],
     )
 
@@ -170,5 +179,5 @@ async def search_chunks(
     request: SearchRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SearchResponse:
-    """Return top-k chunks closest to the query embedding by cosine distance."""
-    return await _semantic_search(request, session)
+    """Retrieve top-k chunks (vector or hybrid), optionally reranked."""
+    return await _search(request, session)

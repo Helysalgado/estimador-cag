@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "DEBUG"
     DATABASE_URL: str = "postgresql+asyncpg://estimator:estimator@localhost:5432/estimator"
 
+    # Session 10 — hybrid retrieval + cross-encoder reranking
+    RERANKING_ENABLED: bool = False
+    RERANKER_MODEL_NAME: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    RETRIEVAL_CANDIDATE_POOL_SIZE: int = 50
+    RETRIEVAL_TOP_K: int = 5
+    RRF_SMOOTHING_K: int = 60
+
     class Config:
         env_file = ".env"
 

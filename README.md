@@ -18,10 +18,11 @@ Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y 
 | **Conversación (Sesión 5)** | Varios turnos en la misma sesión, con memoria y adjuntos | `POST /api/v1/sessions/{id}/estimate` |
 | **Embeddings (Sesión 7)** | Similitud par-a-par y sanity check (`compare.py`) | `scripts/compare.py` |
 | **pgvector (Sesión 8)** | Ingesta persistida + búsqueda semántica top-k | `POST /api/v1/embeddings/ingest`, `POST /api/v1/search` |
+| **Híbrida + rerank (Sesión 10)** | Full-text + RRF + cross-encoder (configs A–D) | `POST /api/v1/search` con `search_mode` / `rerank` |
 
 El cliente **Streamlit** cubre formulario y conversación en pestañas; el pipeline de embeddings se consume por HTTP (curl, Swagger u otro backend).
 
-Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md).
+Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md) · [`session-10`](docs/plans/session-10/README.md).
 
 ## Requisitos
 
@@ -304,6 +305,35 @@ docker compose exec ai_service uv run python scripts/query_examples.py | tee out
 - **Sin índice vectorial (por ahora):** sequential scan como baseline para medir el impacto del índice en directo.
 
 Plan S8: [`docs/plans/session-08/`](docs/plans/session-08/README.md). Rama: **`pre-session-08`**.
+
+---
+
+## Modo 5 — Búsqueda híbrida + reranking (Sesión 10)
+
+Extiende `POST /api/v1/search` con `search_mode` (`vector` \| `hybrid`) y `rerank` (bool). La híbrida fusiona rama vectorial + full-text español (`tsvector` + GIN) con RRF; el rerank usa un cross-encoder multilingüe local (recall 50 → top-5).
+
+```bash
+docker compose up -d --build postgres ai_service
+docker compose exec ai_service uv run alembic upgrade head
+docker compose exec ai_service uv run python -m app.embedding_pipeline.retrieval.verify_reranker
+docker compose exec ai_service uv run python scripts/ingest_sample_corpus.py
+
+# Config D: hybrid + rerank
+curl -s -X POST http://localhost:8000/api/v1/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Integración de pagos con Stripe incluyendo webhooks",
+    "k": 5,
+    "search_mode": "hybrid",
+    "rerank": true,
+    "candidate_pool_size": 50
+  }' | jq
+
+# Medición A–D (precision@5 + latencia)
+uv run python scripts/measure_retrieval.py --config all
+```
+
+Golden set: [`evals/retrieval/golden_set.json`](evals/retrieval/golden_set.json). Informe: [`evals/retrieval/REPORT.md`](evals/retrieval/REPORT.md). Plan: [`docs/plans/session-10/`](docs/plans/session-10/README.md).
 
 ---
 

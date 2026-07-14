@@ -1,0 +1,30 @@
+{
+  "annotation_criterion": "Relevant if it would serve as a direct effort reference for estimating this project",
+  "queries": [
+    {
+      "id": "q01",
+      "query": "E-commerce platform with product catalog, shopping cart and merchant admin panel",
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+    },
+    {
+      "id": "q02",
+      "query": "Mobile payments app with Stripe subscriptions and billing webhooks",
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+    },
+    {
+      "id": "q03",
+      "query": "Integración de pagos con Stripe incluyendo webhooks de facturación",
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+    },
+    {
+      "id": "q04",
+      "query": "HIPAA-compliant patient portal with online appointment scheduling",
+      "relevant_budget_ids": ["BUD-2024-021", "BUD-2024-038"]
+    },
+    {
+      "id": "q05",
+      "query": "Small gourmet shop wants to sell online: product catalog, loyalty points club, sales dashboard with stock charts, secure card payments at checkout, and order confirmation emails. Very unclear scope, mixed topics from a messy discovery call.",
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+    }
+  ]
+}

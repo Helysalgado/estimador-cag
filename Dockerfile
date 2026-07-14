@@ -10,6 +10,8 @@ COPY alembic ./alembic
 COPY scripts ./scripts
 COPY data ./data
 
+# Note: sentence-transformers pulls torch (large image). Prefer local API +
+# Postgres for S10 measurement if rebuild time is prohibitive.
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8000

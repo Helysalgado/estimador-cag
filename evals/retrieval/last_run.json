@@ -1,0 +1,58 @@
+[
+  {
+    "config": "A",
+    "search_mode": "vector",
+    "rerank": false,
+    "mean_precision_at_5": 0.72,
+    "median_latency_ms": 346.7,
+    "per_query_precision": {
+      "q01": 0.8,
+      "q02": 0.4,
+      "q03": 0.4,
+      "q04": 1.0,
+      "q05": 1.0
+    }
+  },
+  {
+    "config": "B",
+    "search_mode": "hybrid",
+    "rerank": false,
+    "mean_precision_at_5": 0.72,
+    "median_latency_ms": 337.3,
+    "per_query_precision": {
+      "q01": 0.8,
+      "q02": 0.4,
+      "q03": 0.4,
+      "q04": 1.0,
+      "q05": 1.0
+    }
+  },
+  {
+    "config": "C",
+    "search_mode": "vector",
+    "rerank": true,
+    "mean_precision_at_5": 0.64,
+    "median_latency_ms": 453.1,
+    "per_query_precision": {
+      "q01": 0.8,
+      "q02": 0.4,
+      "q03": 0.4,
+      "q04": 0.6,
+      "q05": 1.0
+    }
+  },
+  {
+    "config": "D",
+    "search_mode": "hybrid",
+    "rerank": true,
+    "mean_precision_at_5": 0.64,
+    "median_latency_ms": 440.6,
+    "per_query_precision": {
+      "q01": 0.8,
+      "q02": 0.4,
+      "q03": 0.4,
+      "q04": 0.6,
+      "q05": 1.0
+    }
+  }
+]

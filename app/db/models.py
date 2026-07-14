@@ -6,8 +6,8 @@ from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import BigInteger, Computed, DateTime, ForeignKey, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -53,6 +53,11 @@ class Chunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(EMBEDDING_DIMENSION),
+        nullable=True,
+    )
+    content_tsv: Mapped[Any | None] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('spanish', content)", persisted=True),
         nullable=True,
     )
     metadata_: Mapped[dict[str, Any]] = mapped_column(

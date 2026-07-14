@@ -100,6 +100,10 @@ class DuplicateDocumentDetail(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
     k: int = Field(default=5, ge=1, le=100)
+    search_mode: Literal["vector", "hybrid"] = "vector"
+    # None → use settings.RERANKING_ENABLED; explicit bool overrides settings.
+    rerank: bool | None = None
+    candidate_pool_size: int = Field(default=50, ge=1, le=100)
 
 
 class SearchResultItem(BaseModel):
@@ -115,4 +119,6 @@ class SearchResponse(BaseModel):
     query: str
     k: int
     search_time_ms: int
+    search_mode: Literal["vector", "hybrid"] = "vector"
+    rerank: bool = False
     results: list[SearchResultItem]

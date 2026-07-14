@@ -25,6 +25,11 @@
   - **[`plans/session-08/PLAN-IMPLEMENTACION.md`](./plans/session-08/PLAN-IMPLEMENTACION.md)** — plan detallado (material `sesion8.md`)
   - **[`plans/session-08/GAP-ANALISIS.md`](./plans/session-08/GAP-ANALISIS.md)** — cumplimiento vs material
 
+- Sesión 10 (híbrida + reranking + medición):
+  - **[`plans/session-10/`](./plans/session-10/README.md)** — índice pre-ejercicio
+  - **[`plans/session-10/PLAN-IMPLEMENTACION.md`](./plans/session-10/PLAN-IMPLEMENTACION.md)** — plan detallado (material `mat-sesion10.md`)
+  - **[`plans/session-10/GAP-ANALISIS.md`](./plans/session-10/GAP-ANALISIS.md)** — cumplimiento vs material
+
 ## Texto de entrada de ejemplo
 
 - **`transcripcion-reunion.md`**: reunión ficticia con un cliente. Puedes pegar su contenido en el campo **`description`** del formulario Streamlit o del body JSON del API (mínimo 20 caracteres, máximo 80.000).
