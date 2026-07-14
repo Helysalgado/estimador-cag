@@ -30,6 +30,8 @@ Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/est
 - [uv](https://docs.astral.sh/uv/)
 - API key de OpenAI y/o Anthropic en `.env`
 - Redis (opcional; cache solo en el modo formulario)
+- PostgreSQL + pgvector (Sesiones 8–10; vía `docker compose up -d postgres`)
+- Para reranking (Sesión 10): `sentence-transformers` ya viene en deps; la primera carga del modelo descarga pesos de Hugging Face
 
 ## Configuración rápida
 
@@ -48,6 +50,17 @@ Variables relevantes para la **Sesión 5** (además de las del LLM):
 | `MAX_ATTACHMENT_BYTES` | `5000000` | Tamaño máximo por archivo adjunto |
 | `MAX_ATTACHMENTS_PER_REQUEST` | `5` | Archivos por turno |
 | `ESTIMATOR_API_BASE_URL` | `http://localhost:8000` | URL que usa Streamlit |
+
+Variables relevantes para la **Sesión 10** (retrieval híbrido + rerank):
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `DATABASE_URL` | `postgresql+asyncpg://estimator:estimator@localhost:5432/estimator` | Postgres + pgvector |
+| `RERANKING_ENABLED` | `false` | Default de `/search` si el body no envía `rerank` |
+| `RERANKER_MODEL_NAME` | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | Cross-encoder multilingüe local |
+| `RETRIEVAL_CANDIDATE_POOL_SIZE` | `50` | Recall amplio antes del rerank |
+| `RETRIEVAL_TOP_K` | `5` | Top-k por defecto al consumidor |
+| `RRF_SMOOTHING_K` | `60` | Constante de Reciprocal Rank Fusion |
 
 ## Cómo levantar
 
@@ -310,13 +323,39 @@ Plan S8: [`docs/plans/session-08/`](docs/plans/session-08/README.md). Rama: **`p
 
 ## Modo 5 — Búsqueda híbrida + reranking (Sesión 10)
 
-Extiende `POST /api/v1/search` con `search_mode` (`vector` \| `hybrid`) y `rerank` (bool). La híbrida fusiona rama vectorial + full-text español (`tsvector` + GIN) con RRF; el rerank usa un cross-encoder multilingüe local (recall 50 → top-5).
+Extiende `POST /api/v1/search` (y el alias `POST /search`) con:
+
+| Campo | Default | Significado |
+|-------|---------|-------------|
+| `search_mode` | `vector` | `vector` = solo coseno (S8); `hybrid` = vector ∥ full-text español + RRF |
+| `rerank` | `null` → settings | `true`/`false` en el body; si se omite, usa `RERANKING_ENABLED` |
+| `candidate_pool_size` | `50` | Tamaño del recall antes del cross-encoder |
+| `k` | `5` | Resultados finales |
+
+La columna `chunks.content_tsv` (Alembic `0002`, config `'spanish'`) alimenta la rama léxica. El reranker es `CrossEncoder` local (recall → top-k); la inferencia corre en `asyncio.to_thread`.
+
+### Configuraciones del ejercicio (A–D)
+
+| Config | `search_mode` | `rerank` |
+|--------|---------------|----------|
+| A | `vector` | `false` |
+| B | `hybrid` | `false` |
+| C | `vector` | `true` |
+| D | `hybrid` | `true` |
+
+Resultados medidos en este repo: [`evals/retrieval/REPORT.md`](evals/retrieval/REPORT.md) (p. ej. A/B ≈ **0.72** P@5; C/D ≈ **0.64** con ~+100 ms).
+
+### Flujo recomendado (API local + Postgres Docker)
+
+La imagen `ai_service` con `torch`/`sentence-transformers` es muy pesada. Para desarrollo y la medición:
 
 ```bash
-docker compose up -d --build postgres ai_service
-docker compose exec ai_service uv run alembic upgrade head
-docker compose exec ai_service uv run python -m app.embedding_pipeline.retrieval.verify_reranker
-docker compose exec ai_service uv run python scripts/ingest_sample_corpus.py
+docker compose up -d postgres
+uv run alembic upgrade head
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+# otra terminal:
+uv run python scripts/ingest_sample_corpus.py
+uv run python -m app.embedding_pipeline.retrieval.verify_reranker
 
 # Config D: hybrid + rerank
 curl -s -X POST http://localhost:8000/api/v1/search \
@@ -329,11 +368,12 @@ curl -s -X POST http://localhost:8000/api/v1/search \
     "candidate_pool_size": 50
   }' | jq
 
-# Medición A–D (precision@5 + latencia)
+# Medición A–D (precision@5 + latencia mediana)
 uv run python scripts/measure_retrieval.py --config all
 ```
 
-Golden set: [`evals/retrieval/golden_set.json`](evals/retrieval/golden_set.json). Informe: [`evals/retrieval/REPORT.md`](evals/retrieval/REPORT.md). Plan: [`docs/plans/session-10/`](docs/plans/session-10/README.md).
+Golden set: [`evals/retrieval/golden_set.json`](evals/retrieval/golden_set.json).  
+Plan: [`docs/plans/session-10/`](docs/plans/session-10/README.md). Rama: **`session-10/pre-work`**.
 
 ---
 
@@ -433,11 +473,12 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_chunker.py` | Chunker estructural JSON |
 | `tests/test_embedder.py` | Batching y reintentos del embedder (mock) |
 | `tests/test_embeddings_router.py` | `POST /api/v1/embeddings/ingest` (persist) |
-| `tests/test_search_router.py` | `POST /api/v1/search` |
+| `tests/test_search_router.py` | `POST /api/v1/search` (vector / hybrid flags) |
+| `tests/test_rrf_fusion.py` | Reciprocal Rank Fusion |
 | `tests/test_similarity.py` | Similitud coseno (stdlib) |
 | `tests/test_embedding_benchmark.py` | Harness de benchmark (mock, sin red) |
 
-Los tests de embeddings **no** llaman a OpenAI; el sanity check manual sí (ver `SANITY_CHECK.md`).
+Los tests de embeddings **no** llaman a OpenAI; el sanity check manual sí (ver `SANITY_CHECK.md`). El cross-encoder **no** se carga en pytest (lazy); `verify_reranker` y `measure_retrieval.py` sí lo usan.
 
 ### Evals (Session 06 parity)
 
@@ -494,16 +535,24 @@ estimador-cag/
 ├── app/
 │   ├── main.py
 │   ├── config.py
+│   ├── db/                     # Sesión 8: SQLAlchemy + pgvector
 │   ├── routers/
 │   │   ├── estimations.py      # POST /api/v1/estimate (+ /stream)
 │   │   └── sessions.py         # POST /api/v1/sessions, .../estimate
-│   ├── embedding_pipeline/     # Sesión 7: chunker, embedder, ingest
+│   ├── embedding_pipeline/     # Sesiones 7–10: ingest, search, hybrid
 │   │   ├── chunker.py
 │   │   ├── embedder.py
-│   │   ├── router.py
+│   │   ├── router.py             # ingest + /search
 │   │   ├── schemas.py
 │   │   ├── similarity.py
-│   │   ├── embedding_benchmark.py  # Lab: OpenAI vs MiniLM (extra benchmark)
+│   │   ├── retrieval/            # Sesión 10: vector, fulltext, RRF, rerank
+│   │   │   ├── pipeline.py
+│   │   │   ├── fusion.py
+│   │   │   ├── fulltext.py
+│   │   │   ├── vector.py
+│   │   │   ├── reranker.py
+│   │   │   └── verify_reranker.py
+│   │   ├── embedding_benchmark.py
 │   │   └── SANITY_CHECK.md
 │   ├── schemas/
 │   │   ├── estimation.py
@@ -515,24 +564,30 @@ estimador-cag/
 │   │       ├── v1/  (system, user, examples)
 │   │       └── v2/
 │   └── services/
-│       ├── sessions.py           # SessionStore, historial, metadata
-│       ├── session_estimation.py # Turno + heurísticas
-│       ├── attachments.py        # Camino B PDF/DOCX
+│       ├── sessions.py
+│       ├── session_estimation.py
+│       ├── attachments.py
 │       ├── llm_wrapper.py
 │       ├── llm_service.py
 │       └── cache.py
+├── alembic/versions/           # 0001 schema; 0002 content_tsv + GIN
 ├── tests/
 ├── streamlit_app.py
 ├── data/
-│   └── budgets_sample.json     # 15 presupuestos (Sesión 7)
+│   └── budgets_sample.json
 ├── scripts/
-│   ├── compare.py              # Similitud coseno entre dos textos
+│   ├── compare.py
+│   ├── ingest_sample_corpus.py
+│   ├── query_examples.py
+│   ├── measure_retrieval.py    # Sesión 10: configs A–D
 │   └── validate_structure.py
-├── docs/plans/session-04/
-├── docs/plans/session-05/
-├── docs/plans/session-06/
-├── docs/plans/session-07/
-├── evals/                      # Golden dataset + stress (Sesión 6)
+├── examples/                   # Sesión 9: transcripts + trace_s09.py
+├── evals/
+│   ├── retrieval/              # Sesión 10: golden_set + REPORT
+│   ├── golden_dataset.json
+│   └── stress/
+├── docs/plans/session-04/ … session-10/
+├── arquitectura-actual.md      # Sesión 9: diagnóstico
 └── pyproject.toml
 ```
 
@@ -561,6 +616,12 @@ Plantillas en `app/prompts/estimation/<version>/`. Para una nueva versión: copi
 | `MAX_ATTACHMENTS_PER_REQUEST` | `5` | Adjuntos por turno |
 | `ESTIMATOR_API_BASE_URL` | `http://localhost:8000` | Cliente Streamlit |
 | `APP_ENV` | `development` | En dev, 502 incluye detalle JSON |
+| `DATABASE_URL` | ver `.env.example` | Postgres async (pgvector) |
+| `RERANKING_ENABLED` | `false` | Default rerank en `/search` |
+| `RERANKER_MODEL_NAME` | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | Modelo local S10 |
+| `RETRIEVAL_CANDIDATE_POOL_SIZE` | `50` | Recall amplio |
+| `RETRIEVAL_TOP_K` | `5` | Top-k default |
+| `RRF_SMOOTHING_K` | `60` | Suavizado RRF |
 
 ### Si aparece 502 (`Upstream LLM call failed`)
 
@@ -572,11 +633,12 @@ Plantillas en `app/prompts/estimation/<version>/`. Para una nueva versión: copi
 ## Docker
 
 ```bash
-docker compose build
-docker compose up
+docker compose up -d postgres redis
+# API local (recomendado en S10 por el tamaño de torch en la imagen):
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-API + Redis. Streamlit fuera de Compose contra `ESTIMATOR_API_BASE_URL`.
+También puedes `docker compose build && docker compose up` para `ai_service`, pero el build con `sentence-transformers` tarda mucho (deps CUDA/torch). Streamlit fuera de Compose contra `ESTIMATOR_API_BASE_URL`.
 
 ## CI
 
@@ -586,8 +648,12 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 
 - Plan Sesión 04: [`docs/plans/session-04/`](docs/plans/session-04/README.md)
 - Plan Sesión 05: [`docs/plans/session-05/`](docs/plans/session-05/README.md)
-- Plan Sesión 06 (stress CAG): [`docs/plans/session-06/`](docs/plans/session-06/README.md) — incluye [`GAP-ANALISIS.md`](docs/plans/session-06/GAP-ANALISIS.md)
-- Plan Sesión 07 (embeddings): [`docs/plans/session-07/`](docs/plans/session-07/README.md) — incluye [`GAP-ANALISIS.md`](docs/plans/session-07/GAP-ANALISIS.md)
+- Plan Sesión 06 (stress CAG): [`docs/plans/session-06/`](docs/plans/session-06/README.md)
+- Plan Sesión 07 (embeddings): [`docs/plans/session-07/`](docs/plans/session-07/README.md)
+- Plan Sesión 08 (pgvector): [`docs/plans/session-08/`](docs/plans/session-08/README.md)
+- Plan Sesión 10 (híbrida + rerank): [`docs/plans/session-10/`](docs/plans/session-10/README.md)
+- Diagnóstico S9: [`arquitectura-actual.md`](arquitectura-actual.md)
+- Medición retrieval S10: [`evals/retrieval/REPORT.md`](evals/retrieval/REPORT.md)
 - Índice de documentación: [`docs/README.md`](docs/README.md)
 - Texto de ejemplo para `description`: [`docs/transcripcion-reunion.md`](docs/transcripcion-reunion.md)
 
@@ -596,4 +662,8 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 | Rama | Contenido principal |
 |------|---------------------|
 | `pre-session-06` | Stress evals, `turn_observed`, reportes |
-| `pre-session-07` | Pipeline `embedding_pipeline` + ingest + `compare.py` (incluye base S6) |
+| `pre-session-07` | Pipeline `embedding_pipeline` + ingest + `compare.py` |
+| `pre-session-08` | Postgres + pgvector + `POST /search` |
+| `session-09/pre-work` | Diagnóstico arquitectónico RAG |
+| `session-10/pre-work` | Híbrida (RRF) + reranker + medición A–D |
+| `main` | Línea base estable |
