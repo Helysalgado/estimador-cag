@@ -389,7 +389,21 @@ Plan: [`docs/plans/session-10/`](docs/plans/session-10/README.md). Rama: **`sess
 
 ## Modo 6 — Estimación RAG grounded + RAGAS (Sesión 11)
 
-Camino **aparte** del formulario S4 (`POST /api/v1/estimate` texto libre). Usa el retrieval S10, genera un `Estimate` estructurado con citas por línea (`chunk_id` + `evidence` verbatim) y valida con `verify_citations`.
+Camino **aparte** del formulario S4 (`POST /api/v1/estimate` texto libre). Flujo:
+
+`query` → retrieval S10 (híbrida por defecto) → prompt con `chunk_id` → `Estimate` estructurado (Responses API) → `verify_citations` → respuesta con `citation_report`.
+
+| Campo request | Default | Significado |
+|---------------|---------|-------------|
+| `query` | — | Consulta de estimación |
+| `search_mode` | `hybrid` | Mismo contrato que `/search` |
+| `rerank` | `false` | Config B de S10 por defecto |
+| `k` | `5` | Chunks en contexto |
+| `candidate_pool_size` | `50` | Pool si `rerank=true` |
+
+La respuesta incluye `estimate` (líneas con `grounded` / `sources`), `citation_report` (`ok`, dangling ids), `retrieval` (`chunk_ids` + `contexts`) y `request_id`. `/api/v1/estimate` legacy no cambia.
+
+### Flujo recomendado
 
 ```bash
 # API + corpus ya levantados (ver Modo 5)
@@ -405,6 +419,16 @@ curl -s -X POST http://localhost:8000/api/v1/rag/estimate \
 # Eval RAGAS (5 queries + ground_truth) → evals/retrieval/RAGAS_REPORT.md
 uv run python scripts/eval_ragas.py
 ```
+
+### Resultados medidos (RAGAS)
+
+Promedios en este repo ([`evals/retrieval/RAGAS_REPORT.md`](evals/retrieval/RAGAS_REPORT.md)):
+
+| Faithfulness | Answer relevancy | Context precision | Context recall |
+|-------------:|-----------------:|------------------:|---------------:|
+| 0.72 | 0.42 | 0.90 | 0.58 |
+
+`verify_citations` OK en las 5 queries del golden set. Context precision fuerte; answer relevancy más baja porque la respuesta es estructurada (líneas + huecos `grounded=false`) frente a un `ground_truth` en prosa.
 
 | Pieza | Ubicación |
 |-------|-----------|
@@ -516,10 +540,11 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_embeddings_router.py` | `POST /api/v1/embeddings/ingest` (persist) |
 | `tests/test_search_router.py` | `POST /api/v1/search` (vector / hybrid flags) |
 | `tests/test_rrf_fusion.py` | Reciprocal Rank Fusion |
+| `tests/test_verify_citations.py` | Integridad de schema + citación colgante (S11) |
 | `tests/test_similarity.py` | Similitud coseno (stdlib) |
 | `tests/test_embedding_benchmark.py` | Harness de benchmark (mock, sin red) |
 
-Los tests de embeddings **no** llaman a OpenAI; el sanity check manual sí (ver `SANITY_CHECK.md`). El cross-encoder **no** se carga en pytest (lazy); `verify_reranker` y `measure_retrieval.py` sí lo usan.
+Los tests de embeddings **no** llaman a OpenAI; el sanity check manual sí (ver `SANITY_CHECK.md`). El cross-encoder **no** se carga en pytest (lazy); `verify_reranker` y `measure_retrieval.py` sí lo usan. `eval_ragas.py` sí llama a OpenAI (generación + juez).
 
 ### Evals (Session 06 parity)
 
