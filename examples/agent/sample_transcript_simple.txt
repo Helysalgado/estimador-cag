@@ -1,0 +1,15 @@
+Discovery call — small ecommerce Stripe checkout
+
+Client: Ana Ruiz (ShopLocal MX)
+Consultant: estimation team
+Date: short scoping call
+
+[00:00] Consultant: What do you need first?
+
+[00:12] Ana: We already have a product catalog. The priority is checkout with card
+payments through Stripe, including webhooks so orders are marked paid. Nothing
+fancy — cart, payment intents, webhook reconciliation. Merchant admin can wait.
+
+[00:48] Consultant: Any mobile app?
+
+[00:55] Ana: No, web only. Just reliable Stripe checkout for the existing catalog.

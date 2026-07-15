@@ -1,0 +1,34 @@
+Discovery call — multi-workstream platform (complex)
+
+Client: Marta Solís (Ops lead, GreenHealth Clinics + marketplace spin-off)
+Consultant: estimation team
+Date: messy kickoff; priorities still shifting
+
+[00:00:10] Consultant: Walk us through what you want to build.
+
+[00:00:25] Marta: There are really three tracks and they keep fighting each other.
+First track: an online shop for specialty products — catalog with variants,
+shopping cart, and a merchant admin panel for orders and refunds. Classic
+headless ecommerce. We have internal sketches.
+
+[00:01:20] Marta: Second track: payments. We need Stripe Checkout for cards, but
+also Stripe Connect because producers get paid after delivery confirmation —
+split payouts, escrow-style holds. Billing webhooks must reconcile both consumer
+payments and vendor transfers. Someone also said “subscriptions” but that is not
+confirmed.
+
+[00:02:40] Marta: Third track is clinical. The clinic board wants a HIPAA-minded
+patient portal: appointment scheduling with SMS reminders, secure messaging, and
+eventually FHIR lab results for patients. That is a different stack and
+compliance bar. It might share login with the shop later, but not in phase one.
+
+[00:04:00] Consultant: So ecommerce catalog/admin, Stripe consumer + Connect
+payouts, and a patient portal with scheduling / FHIR?
+
+[00:04:18] Marta: Yes. Please estimate each track separately; do not collapse them
+into one generic “platform” number. If historical budgets differ a lot, say so.
+Mobile native apps are out of scope for now — responsive web is enough.
+
+[00:05:05] Marta: Also ignore loyalty points and marketing emails for this estimate;
+those came up but we have no brief. Focus on catalog+admin, Stripe/Connect
+payments, and HIPAA portal + scheduling (+ FHIR viewing if you find refs).

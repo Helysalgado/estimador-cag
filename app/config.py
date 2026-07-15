@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     RAGAS_JUDGE_MODEL: str = "gpt-4o-mini"
     RAGAS_EMBEDDING_MODEL: str = "text-embedding-3-small"
 
+    # Session 12 — manual estimation agent
+    AGENT_MODEL: str = "gpt-5"
+    AGENT_DEBUG_MODEL: str = "gpt-5-mini"
+    AGENT_REASONING_EFFORT: str = "medium"
+    AGENT_MAX_ITERATIONS: int = 12
+
     class Config:
         env_file = ".env"
 

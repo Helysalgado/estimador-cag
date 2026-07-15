@@ -20,10 +20,11 @@ Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y 
 | **pgvector (Sesión 8)** | Ingesta persistida + búsqueda semántica top-k | `POST /api/v1/embeddings/ingest`, `POST /api/v1/search` |
 | **Híbrida + rerank (Sesión 10)** | Full-text + RRF + cross-encoder (configs A–D) | `POST /api/v1/search` con `search_mode` / `rerank` |
 | **RAG grounded (Sesión 11)** | Estimación estructurada con citas por línea + RAGAS | `POST /api/v1/rag/estimate` |
+| **Agente (Sesión 12)** | Bucle tools: `search_budgets` + `calculate_estimate` + traza | `POST /api/v1/agent/estimate` |
 
 El cliente **Streamlit** cubre formulario y conversación en pestañas; el pipeline de embeddings se consume por HTTP (curl, Swagger u otro backend).
 
-Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md) · [`session-10`](docs/plans/session-10/README.md) · [`session-11`](docs/plans/session-11/README.md).
+Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md) · [`session-10`](docs/plans/session-10/README.md) · [`session-11`](docs/plans/session-11/README.md) · [`session-12`](docs/plans/session-12/README.md).
 
 ## Requisitos
 
@@ -71,6 +72,15 @@ Variables relevantes para la **Sesión 11** (generación grounded + RAGAS):
 | `RAG_GENERATION_MODEL` | `gpt-4o-mini` | Structured output del estimate RAG |
 | `RAGAS_JUDGE_MODEL` | `gpt-4o-mini` | LLM juez de métricas RAGAS |
 | `RAGAS_EMBEDDING_MODEL` | `text-embedding-3-small` | Embeddings del eval RAGAS |
+
+Variables relevantes para la **Sesión 12** (agente):
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `AGENT_MODEL` | `gpt-5` | Modelo del bucle (entrega) |
+| `AGENT_DEBUG_MODEL` | `gpt-5-mini` | Smoke del bucle (`--debug`) |
+| `AGENT_REASONING_EFFORT` | `medium` | `reasoning.effort` Responses API |
+| `AGENT_MAX_ITERATIONS` | `12` | Tope de salvaguarda del bucle |
 
 ## Cómo levantar
 
@@ -442,6 +452,62 @@ Rama: **`session-11/pre-work`**.
 
 ---
 
+## Modo 7 — Agente de estimación (Sesión 12)
+
+Capa de **decisión** encima del retrieval S10: el modelo elige cuántas búsquedas hacer y cuándo calcular. Bucle **manual** (sin LangChain / agents SDK): `function_call` → ejecutas tú → `function_call_output` + `previous_response_id`. No modifica `/api/v1/estimate` ni `/api/v1/rag/estimate`.
+
+Tools:
+
+| Tool | Rol |
+|------|-----|
+| `search_budgets` | Envuelve hybrid retrieve (una query enfocada por componente) |
+| `calculate_estimate` | Mediana determinista de `reference_amounts` → total (sin LLM) |
+
+| Campo request | Default | Significado |
+|---------------|---------|-------------|
+| `transcript` | — | Transcripción de reunión (≥20 chars) |
+| `model` | `AGENT_MODEL` (`gpt-5`) | Override opcional; smoke con `gpt-5-mini` |
+| `max_iterations` | `12` | Tope del bucle |
+| `search_mode` / `rerank` / `k` | hybrid / false / 5 | Flags del retrieval S10 |
+
+Respuesta: `estimate_text`, `trace` / `trace_text` (STEP reasoning → action → observation), `tool_calls`, `iterations`, `request_id`.
+
+### Flujo recomendado
+
+```bash
+# API + corpus (Modo 5)
+curl -s -X POST http://localhost:8000/api/v1/agent/estimate \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n --rawfile t examples/agent/sample_transcript_complex.txt '{transcript:$t}')" | jq
+
+# CLI + traza (recomendado para la entrega)
+uv run python scripts/run_agent.py \
+  --transcript examples/agent/sample_transcript_complex.txt \
+  --out evals/agent/TRACE_complex.md
+
+# Smoke barato del bucle
+uv run python scripts/run_agent.py \
+  --transcript examples/agent/sample_transcript_simple.txt \
+  --debug \
+  --out evals/agent/TRACE_simple.md
+```
+
+### Resultado medido (transcript complex)
+
+Corrida en este repo ([`evals/agent/TRACE_complex.md`](evals/agent/TRACE_complex.md)): modelo `gpt-5`, **6×** `search_budgets` (ecommerce, Stripe/Connect, scheduling, messaging, FHIR, HIPAA layer) + **1×** `calculate_estimate`; termina solo (`stopped_reason=completed`). Cumple el criterio de >1 componente y >1 búsqueda.
+
+| Pieza | Ubicación |
+|-------|-----------|
+| Agente | `app/agents/` |
+| Endpoint | `POST /api/v1/agent/estimate` |
+| Transcripts | `examples/agent/sample_transcript_{simple,complex}.txt` |
+| Traza complex | [`evals/agent/TRACE_complex.md`](evals/agent/TRACE_complex.md) |
+| Plan | [`docs/plans/session-12/`](docs/plans/session-12/README.md) |
+
+Rama: **`session-12/pre-work`**.
+
+---
+
 ## Adjuntos: Camino B (extracción local)
 
 No usamos visión del modelo ni RAG en esta fase. Los archivos se procesan **en el servidor** antes de llamar al LLM:
@@ -541,6 +607,7 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_search_router.py` | `POST /api/v1/search` (vector / hybrid flags) |
 | `tests/test_rrf_fusion.py` | Reciprocal Rank Fusion |
 | `tests/test_verify_citations.py` | Integridad de schema + citación colgante (S11) |
+| `tests/test_agent_tools.py` | `calculate_estimate` + schemas/tools/traza (S12, sin OpenAI) |
 | `tests/test_similarity.py` | Similitud coseno (stdlib) |
 | `tests/test_embedding_benchmark.py` | Harness de benchmark (mock, sin red) |
 
@@ -615,6 +682,7 @@ estimador-cag/
 │   │   ├── generation/           # Sesión 11: estimate estructurado + citas
 │   │   ├── embedding_benchmark.py
 │   │   └── SANITY_CHECK.md
+│   ├── agents/                 # Sesión 12: bucle tools + traza
 │   ├── schemas/
 │   │   ├── estimation.py
 │   │   └── sessions.py
@@ -642,13 +710,17 @@ estimador-cag/
 │   ├── query_examples.py
 │   ├── measure_retrieval.py    # Sesión 10: configs A–D
 │   ├── eval_ragas.py           # Sesión 11: métricas RAGAS
+│   ├── run_agent.py            # Sesión 12: agente + traza
 │   └── validate_structure.py
-├── examples/                   # Sesión 9: transcripts + trace_s09.py
+├── examples/
+│   ├── transcripts/            # Sesión 9
+│   └── agent/                  # Sesión 12: sample_transcript_*.txt
 ├── evals/
 │   ├── retrieval/              # S10 REPORT + S11 RAGAS_REPORT + golden_set
+│   ├── agent/                  # Sesión 12: TRACE_complex.md
 │   ├── golden_dataset.json
 │   └── stress/
-├── docs/plans/session-04/ … session-11/
+├── docs/plans/session-04/ … session-12/
 ├── arquitectura-actual.md      # Sesión 9: diagnóstico
 └── pyproject.toml
 ```
@@ -687,6 +759,10 @@ Plantillas en `app/prompts/estimation/<version>/`. Para una nueva versión: copi
 | `RAG_GENERATION_MODEL` | `gpt-4o-mini` | Structured RAG estimate (S11) |
 | `RAGAS_JUDGE_MODEL` | `gpt-4o-mini` | Juez RAGAS (S11) |
 | `RAGAS_EMBEDDING_MODEL` | `text-embedding-3-small` | Embeddings RAGAS (S11) |
+| `AGENT_MODEL` | `gpt-5` | Modelo agente S12 |
+| `AGENT_DEBUG_MODEL` | `gpt-5-mini` | Smoke agente S12 |
+| `AGENT_REASONING_EFFORT` | `medium` | Effort Responses API |
+| `AGENT_MAX_ITERATIONS` | `12` | Tope bucle agente |
 
 ### Si aparece 502 (`Upstream LLM call failed`)
 
@@ -718,9 +794,11 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 - Plan Sesión 08 (pgvector): [`docs/plans/session-08/`](docs/plans/session-08/README.md)
 - Plan Sesión 10 (híbrida + rerank): [`docs/plans/session-10/`](docs/plans/session-10/README.md)
 - Plan Sesión 11 (RAG grounded + RAGAS): [`docs/plans/session-11/`](docs/plans/session-11/README.md)
+- Plan Sesión 12 (agente + tools): [`docs/plans/session-12/`](docs/plans/session-12/README.md)
 - Diagnóstico S9: [`arquitectura-actual.md`](arquitectura-actual.md)
 - Medición retrieval S10: [`evals/retrieval/REPORT.md`](evals/retrieval/REPORT.md)
 - Informe RAGAS S11: [`evals/retrieval/RAGAS_REPORT.md`](evals/retrieval/RAGAS_REPORT.md)
+- Traza agente S12: [`evals/agent/TRACE_complex.md`](evals/agent/TRACE_complex.md)
 - Índice de documentación: [`docs/README.md`](docs/README.md)
 - Texto de ejemplo para `description`: [`docs/transcripcion-reunion.md`](docs/transcripcion-reunion.md)
 
@@ -734,4 +812,5 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 | `session-09/pre-work` | Diagnóstico arquitectónico RAG |
 | `session-10/pre-work` | Híbrida (RRF) + reranker + medición A–D |
 | `session-11/pre-work` | Estimate RAG structured + `verify_citations` + RAGAS |
+| `session-12/pre-work` | Agente manual (`search_budgets` + `calculate_estimate`) + traza |
 | `main` | Línea base estable |
