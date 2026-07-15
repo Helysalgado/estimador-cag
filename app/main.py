@@ -9,6 +9,7 @@ from app.config import settings
 from app.db.session import dispose_engine
 from app.embedding_pipeline import router as embeddings_router
 from app.embedding_pipeline.errors import DuplicateDocumentError
+from app.embedding_pipeline.generation import router as rag_router
 from app.routers import estimations, sessions
 
 
@@ -67,6 +68,7 @@ app.include_router(embeddings_router.router)
 app.include_router(embeddings_router.material_router)
 app.include_router(embeddings_router.search_router)
 app.include_router(embeddings_router.material_search_router)
+app.include_router(rag_router.router)
 
 
 # -------------------------

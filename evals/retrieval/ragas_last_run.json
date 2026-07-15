@@ -1,0 +1,77 @@
+[
+  {
+    "id": "q01",
+    "question": "E-commerce platform with product catalog, shopping cart and merchant admin panel",
+    "answer": "- Merchant admin dashboard for orders, refunds, and promotion rules. | hours=100.0 | grounded=True\n- Product catalog service including CRUD for products, variants, and inventory with Elasticsearch-backed search. | hours=140.0 | grounded=True\n- Checkout and payments system including cart, tax calculation, and Stripe payment intents. | hours=120.0 | grounded=True\ntotal_hours=360.0",
+    "contexts": [
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Merchant admin dashboard\nDescription: React admin for orders, refunds, and promotion rules.\nTech stack: react, typescript\nComplexity: low\nEstimated hours: 100",
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Product catalog service\nDescription: CRUD for products, variants, and inventory with Elasticsearch-backed search.\nTech stack: node_express, mongodb, elasticsearch\nComplexity: medium\nEstimated hours: 140",
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Checkout and payments\nDescription: Cart, tax calculation, and Stripe payment intents with webhook reconciliation.\nTech stack: node_express, stripe\nComplexity: high\nEstimated hours: 120",
+      "[Project: Marketplace for organic producers with multi-vendor payouts]\n[Client sector: ecommerce | Year: 2023 | Main tech: ruby_on_rails]\n\nComponent: Multi-vendor catalog\nDescription: Vendor onboarding, commission rules, and localized product descriptions.\nTech stack: ruby_on_rails, postgresql\nComplexity: high\nEstimated hours: 180",
+      "[Project: B2B spare parts ordering portal with ERP sync]\n[Client sector: industrial | Year: 2022 | Main tech: sap_integration]\n\nComponent: Dealer portal\nDescription: Contract pricing, bulk CSV upload, and credit limit checks.\nTech stack: angular, java_spring\nComplexity: medium\nEstimated hours: 180"
+    ],
+    "ground_truth": "Estimate for a headless e-commerce stack similar to ShopNova (BUD-2023-008): product catalog service ~140h (Elasticsearch-backed), checkout/cart with Stripe payment intents ~120h, merchant admin dashboard for orders/refunds ~100h. Multi-vendor marketplace catalog (BUD-2023-012) may add ~180h if multi-vendor is in scope. Total similar projects ~360–420h.",
+    "citation_ok": true,
+    "request_id": "8e76a566-92d0-46ee-bf1f-8acb230e63ab"
+  },
+  {
+    "id": "q02",
+    "question": "Mobile payments app with Stripe subscriptions and billing webhooks",
+    "answer": "- Checkout and payments implementation including Cart, tax calculation, and Stripe payment intents with webhook reconciliation. | hours=120.0 | grounded=True\n- Implementation of Stripe Connect for split payouts and escrow until delivery confirmation. | hours=140.0 | grounded=True\ntotal_hours=260.0",
+    "contexts": [
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Checkout and payments\nDescription: Cart, tax calculation, and Stripe payment intents with webhook reconciliation.\nTech stack: node_express, stripe\nComplexity: high\nEstimated hours: 120",
+      "[Project: UPI micro-merchant payments and settlement dashboard]\n[Client sector: finance | Year: 2024 | Main tech: node_express]\n\nComponent: Merchant dashboard\nDescription: Real-time transaction feed and CSV export for accounting.\nTech stack: react, node_express\nComplexity: low\nEstimated hours: 40",
+      "[Project: Marketplace for organic producers with multi-vendor payouts]\n[Client sector: ecommerce | Year: 2023 | Main tech: ruby_on_rails]\n\nComponent: Split payouts\nDescription: Stripe Connect transfers and escrow until delivery confirmation.\nTech stack: ruby_on_rails, stripe\nComplexity: high\nEstimated hours: 140",
+      "[Project: Mobile banking API with OAuth 2.0 authentication and PSD2 compliance]\n[Client sector: finance | Year: 2024 | Main tech: ruby_on_rails]\n\nComponent: Mobile client SDK integration\nDescription: Thin SDK wrappers and certificate pinning for iOS and Android banking apps.\nTech stack: swift, kotlin\nComplexity: medium\nEstimated hours: 160",
+      "[Project: UPI micro-merchant payments and settlement dashboard]\n[Client sector: finance | Year: 2024 | Main tech: node_express]\n\nComponent: UPI collect request handler\nDescription: NPCI-compliant collect flows, VPA validation, and idempotent settlement records.\nTech stack: node_express, postgresql, redis\nComplexity: high\nEstimated hours: 140"
+    ],
+    "ground_truth": "Closest grounded references: ShopNova checkout and payments (CHK-102) — cart, tax, Stripe payment intents with webhook reconciliation (~120h). GreenMarket split payouts (PAY-702) — Stripe Connect transfers/escrow (~140h). Subscriptions are not named explicitly; mark subscription-specific work as ungrounded assumption. Combined Stripe-related effort roughly 120–260h depending on Connect vs Checkout.",
+    "citation_ok": true,
+    "request_id": "f822f179-43e3-44b3-880e-f8525f2634d0"
+  },
+  {
+    "id": "q03",
+    "question": "Integración de pagos con Stripe incluyendo webhooks de facturación",
+    "answer": "- Integration of Stripe payment intents including webhook reconciliation. | hours=120.0 | grounded=True\ntotal_hours=120.0",
+    "contexts": [
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Checkout and payments\nDescription: Cart, tax calculation, and Stripe payment intents with webhook reconciliation.\nTech stack: node_express, stripe\nComplexity: high\nEstimated hours: 120",
+      "[Project: Fleet routing and real-time shipment tracking]\n[Client sector: logistics | Year: 2023 | Main tech: java_spring]\n\nComponent: Warehouse integration\nDescription: WMS webhooks for pick/pack status and label printing.\nTech stack: java_spring\nComplexity: medium\nEstimated hours: 100",
+      "[Project: Marketplace for organic producers with multi-vendor payouts]\n[Client sector: ecommerce | Year: 2023 | Main tech: ruby_on_rails]\n\nComponent: Split payouts\nDescription: Stripe Connect transfers and escrow until delivery confirmation.\nTech stack: ruby_on_rails, stripe\nComplexity: high\nEstimated hours: 140",
+      "[Project: B2B spare parts ordering portal with ERP sync]\n[Client sector: industrial | Year: 2022 | Main tech: sap_integration]\n\nComponent: Invoice PDF generation\nDescription: Localized tax lines and e-invoice XML for EU jurisdictions.\nTech stack: java_spring\nComplexity: medium\nEstimated hours: 100",
+      "[Project: UPI micro-merchant payments and settlement dashboard]\n[Client sector: finance | Year: 2024 | Main tech: node_express]\n\nComponent: Settlement reconciliation\nDescription: Nightly bank file ingestion and mismatch alerting for merchants.\nTech stack: node_express, postgresql\nComplexity: medium\nEstimated hours: 80"
+    ],
+    "ground_truth": "Referencias: BUD-2023-008 CHK-102 (Stripe payment intents + reconciliación por webhooks, ~120h) y BUD-2023-012 PAY-702 (Stripe Connect, transfers, ~140h). Estimar integración de pagos/webhooks en ese rango; no inventar módulos de facturación SaaS fuera del contexto.",
+    "citation_ok": true,
+    "request_id": "ffc65941-8f9b-4ea3-aaa2-26a8a77850a4"
+  },
+  {
+    "id": "q04",
+    "question": "HIPAA-compliant patient portal with online appointment scheduling",
+    "answer": "- Appointment scheduling engine | hours=180.0 | grounded=True\n- Patient portal UI | hours=160.0 | grounded=True\n- HIPAA audit and encryption layer | hours=180.0 | grounded=True\ntotal_hours=520.0",
+    "contexts": [
+      "[Project: HIPAA-compliant patient portal and appointment scheduling]\n[Client sector: healthcare | Year: 2024 | Main tech: python_django]\n\nComponent: Appointment scheduling engine\nDescription: Provider calendars, reminders via SMS, and EHR integration hooks.\nTech stack: python_django, redis, twilio\nComplexity: medium\nEstimated hours: 180",
+      "[Project: HIPAA-compliant patient portal and appointment scheduling]\n[Client sector: healthcare | Year: 2024 | Main tech: python_django]\n\nComponent: Patient portal UI\nDescription: Secure messaging, lab results viewing, and MFA enrollment for patients.\nTech stack: react, python_django\nComplexity: medium\nEstimated hours: 160",
+      "[Project: HIPAA-compliant patient portal and appointment scheduling]\n[Client sector: healthcare | Year: 2024 | Main tech: python_django]\n\nComponent: HIPAA audit and encryption layer\nDescription: Field-level encryption, access logs, and BAA-compliant data retention policies.\nTech stack: python_django, postgresql, aws_kms\nComplexity: high\nEstimated hours: 180",
+      "[Project: HL7 FHIR lab results hub for regional clinics]\n[Client sector: healthcare | Year: 2024 | Main tech: java_spring]\n\nComponent: Patient results viewer\nDescription: Simplified lay-language summaries with access consent checks.\nTech stack: react, java_spring\nComplexity: low\nEstimated hours: 80",
+      "[Project: HL7 FHIR lab results hub for regional clinics]\n[Client sector: healthcare | Year: 2024 | Main tech: java_spring]\n\nComponent: Clinician alert rules\nDescription: Critical value thresholds and pager integration for on-call staff.\nTech stack: java_spring, kafka\nComplexity: medium\nEstimated hours: 100"
+    ],
+    "ground_truth": "MediTrack (BUD-2024-021): HIPAA audit/encryption layer ~180h, patient portal UI (secure messaging, lab results, MFA) ~160h, appointment scheduling engine (calendars, SMS reminders, EHR hooks) ~180h; project total ~520h. LabResults (BUD-2024-038) adds FHIR lab results/patient viewer context (~80–180h components) if results viewing is needed.",
+    "citation_ok": true,
+    "request_id": "2f74c3c2-71ea-4fcc-a606-c4e2adafd047"
+  },
+  {
+    "id": "q05",
+    "question": "Small gourmet shop wants to sell online: product catalog, loyalty points club, sales dashboard with stock charts, secure card payments at checkout, and order confirmation emails. Very unclear scope, mixed topics from a messy discovery call.",
+    "answer": "- Multi-vendor catalog implementation for product listing. | hours=180.0 | grounded=True\n- Checkout and secure payment processing using Stripe. | hours=120.0 | grounded=True\n- CRUD functionalities for product inventory and search capabilities. | hours=140.0 | grounded=True\n- Admin dashboard for managing orders and promotions. | hours=100.0 | grounded=True\ntotal_hours=540.0",
+    "contexts": [
+      "[Project: Marketplace for organic producers with multi-vendor payouts]\n[Client sector: ecommerce | Year: 2023 | Main tech: ruby_on_rails]\n\nComponent: Multi-vendor catalog\nDescription: Vendor onboarding, commission rules, and localized product descriptions.\nTech stack: ruby_on_rails, postgresql\nComplexity: high\nEstimated hours: 180",
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Checkout and payments\nDescription: Cart, tax calculation, and Stripe payment intents with webhook reconciliation.\nTech stack: node_express, stripe\nComplexity: high\nEstimated hours: 120",
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Product catalog service\nDescription: CRUD for products, variants, and inventory with Elasticsearch-backed search.\nTech stack: node_express, mongodb, elasticsearch\nComplexity: medium\nEstimated hours: 140",
+      "[Project: Headless e-commerce platform with catalog sync and checkout]\n[Client sector: ecommerce | Year: 2023 | Main tech: node_express]\n\nComponent: Merchant admin dashboard\nDescription: React admin for orders, refunds, and promotion rules.\nTech stack: react, typescript\nComplexity: low\nEstimated hours: 100",
+      "[Project: Marketplace for organic producers with multi-vendor payouts]\n[Client sector: ecommerce | Year: 2023 | Main tech: ruby_on_rails]\n\nComponent: Split payouts\nDescription: Stripe Connect transfers and escrow until delivery confirmation.\nTech stack: ruby_on_rails, stripe\nComplexity: high\nEstimated hours: 140"
+    ],
+    "ground_truth": "Grounded from BUD-2023-008: catalog ~140h, Stripe checkout/cart ~120h, merchant admin dashboard ~100h. Loyalty points club and order confirmation emails are not in sample budgets — mark those lines ungrounded with assumptions. Optionally BUD-2023-012 multi-vendor catalog if marketplace-like. Prefer partial estimate with explicit ungrounded gaps over inventing hours for loyalty/email.",
+    "citation_ok": true,
+    "request_id": "68b79811-5318-4725-92f4-4f0c60a6a197"
+  }
+]

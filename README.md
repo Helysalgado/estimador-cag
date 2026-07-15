@@ -19,10 +19,11 @@ Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y 
 | **Embeddings (Sesión 7)** | Similitud par-a-par y sanity check (`compare.py`) | `scripts/compare.py` |
 | **pgvector (Sesión 8)** | Ingesta persistida + búsqueda semántica top-k | `POST /api/v1/embeddings/ingest`, `POST /api/v1/search` |
 | **Híbrida + rerank (Sesión 10)** | Full-text + RRF + cross-encoder (configs A–D) | `POST /api/v1/search` con `search_mode` / `rerank` |
+| **RAG grounded (Sesión 11)** | Estimación estructurada con citas por línea + RAGAS | `POST /api/v1/rag/estimate` |
 
 El cliente **Streamlit** cubre formulario y conversación en pestañas; el pipeline de embeddings se consume por HTTP (curl, Swagger u otro backend).
 
-Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md) · [`session-10`](docs/plans/session-10/README.md).
+Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md) · [`session-10`](docs/plans/session-10/README.md) · [`session-11`](docs/plans/session-11/README.md).
 
 ## Requisitos
 
@@ -30,8 +31,9 @@ Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/est
 - [uv](https://docs.astral.sh/uv/)
 - API key de OpenAI y/o Anthropic en `.env`
 - Redis (opcional; cache solo en el modo formulario)
-- PostgreSQL + pgvector (Sesiones 8–10; vía `docker compose up -d postgres`)
+- PostgreSQL + pgvector (Sesiones 8–11; vía `docker compose up -d postgres`)
 - Para reranking (Sesión 10): `sentence-transformers` ya viene en deps; la primera carga del modelo descarga pesos de Hugging Face
+- Para RAGAS (Sesión 11): `ragas` + `datasets` + `langchain-openai` (vía `uv sync`)
 
 ## Configuración rápida
 
@@ -61,6 +63,14 @@ Variables relevantes para la **Sesión 10** (retrieval híbrido + rerank):
 | `RETRIEVAL_CANDIDATE_POOL_SIZE` | `50` | Recall amplio antes del rerank |
 | `RETRIEVAL_TOP_K` | `5` | Top-k por defecto al consumidor |
 | `RRF_SMOOTHING_K` | `60` | Constante de Reciprocal Rank Fusion |
+
+Variables relevantes para la **Sesión 11** (generación grounded + RAGAS):
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `RAG_GENERATION_MODEL` | `gpt-4o-mini` | Structured output del estimate RAG |
+| `RAGAS_JUDGE_MODEL` | `gpt-4o-mini` | LLM juez de métricas RAGAS |
+| `RAGAS_EMBEDDING_MODEL` | `text-embedding-3-small` | Embeddings del eval RAGAS |
 
 ## Cómo levantar
 
@@ -377,6 +387,37 @@ Plan: [`docs/plans/session-10/`](docs/plans/session-10/README.md). Rama: **`sess
 
 ---
 
+## Modo 6 — Estimación RAG grounded + RAGAS (Sesión 11)
+
+Camino **aparte** del formulario S4 (`POST /api/v1/estimate` texto libre). Usa el retrieval S10, genera un `Estimate` estructurado con citas por línea (`chunk_id` + `evidence` verbatim) y valida con `verify_citations`.
+
+```bash
+# API + corpus ya levantados (ver Modo 5)
+curl -s -X POST http://localhost:8000/api/v1/rag/estimate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Integración de pagos con Stripe incluyendo webhooks de facturación",
+    "k": 5,
+    "search_mode": "hybrid",
+    "rerank": false
+  }' | jq
+
+# Eval RAGAS (5 queries + ground_truth) → evals/retrieval/RAGAS_REPORT.md
+uv run python scripts/eval_ragas.py
+```
+
+| Pieza | Ubicación |
+|-------|-----------|
+| Schemas / verify / generate | `app/embedding_pipeline/generation/` |
+| Endpoint | `POST /api/v1/rag/estimate` |
+| Golden + `ground_truth` | `evals/retrieval/golden_set.json` |
+| Informe RAGAS | [`evals/retrieval/RAGAS_REPORT.md`](evals/retrieval/RAGAS_REPORT.md) |
+| Plan | [`docs/plans/session-11/`](docs/plans/session-11/README.md) |
+
+Rama: **`session-11/pre-work`**.
+
+---
+
 ## Adjuntos: Camino B (extracción local)
 
 No usamos visión del modelo ni RAG en esta fase. Los archivos se procesan **en el servidor** antes de llamar al LLM:
@@ -539,19 +580,14 @@ estimador-cag/
 │   ├── routers/
 │   │   ├── estimations.py      # POST /api/v1/estimate (+ /stream)
 │   │   └── sessions.py         # POST /api/v1/sessions, .../estimate
-│   ├── embedding_pipeline/     # Sesiones 7–10: ingest, search, hybrid
+│   ├── embedding_pipeline/     # Sesiones 7–11: ingest, search, hybrid, RAG
 │   │   ├── chunker.py
 │   │   ├── embedder.py
 │   │   ├── router.py             # ingest + /search
 │   │   ├── schemas.py
 │   │   ├── similarity.py
 │   │   ├── retrieval/            # Sesión 10: vector, fulltext, RRF, rerank
-│   │   │   ├── pipeline.py
-│   │   │   ├── fusion.py
-│   │   │   ├── fulltext.py
-│   │   │   ├── vector.py
-│   │   │   ├── reranker.py
-│   │   │   └── verify_reranker.py
+│   │   ├── generation/           # Sesión 11: estimate estructurado + citas
 │   │   ├── embedding_benchmark.py
 │   │   └── SANITY_CHECK.md
 │   ├── schemas/
@@ -580,13 +616,14 @@ estimador-cag/
 │   ├── ingest_sample_corpus.py
 │   ├── query_examples.py
 │   ├── measure_retrieval.py    # Sesión 10: configs A–D
+│   ├── eval_ragas.py           # Sesión 11: métricas RAGAS
 │   └── validate_structure.py
 ├── examples/                   # Sesión 9: transcripts + trace_s09.py
 ├── evals/
-│   ├── retrieval/              # Sesión 10: golden_set + REPORT
+│   ├── retrieval/              # S10 REPORT + S11 RAGAS_REPORT + golden_set
 │   ├── golden_dataset.json
 │   └── stress/
-├── docs/plans/session-04/ … session-10/
+├── docs/plans/session-04/ … session-11/
 ├── arquitectura-actual.md      # Sesión 9: diagnóstico
 └── pyproject.toml
 ```
@@ -622,6 +659,9 @@ Plantillas en `app/prompts/estimation/<version>/`. Para una nueva versión: copi
 | `RETRIEVAL_CANDIDATE_POOL_SIZE` | `50` | Recall amplio |
 | `RETRIEVAL_TOP_K` | `5` | Top-k default |
 | `RRF_SMOOTHING_K` | `60` | Suavizado RRF |
+| `RAG_GENERATION_MODEL` | `gpt-4o-mini` | Structured RAG estimate (S11) |
+| `RAGAS_JUDGE_MODEL` | `gpt-4o-mini` | Juez RAGAS (S11) |
+| `RAGAS_EMBEDDING_MODEL` | `text-embedding-3-small` | Embeddings RAGAS (S11) |
 
 ### Si aparece 502 (`Upstream LLM call failed`)
 
@@ -652,8 +692,10 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 - Plan Sesión 07 (embeddings): [`docs/plans/session-07/`](docs/plans/session-07/README.md)
 - Plan Sesión 08 (pgvector): [`docs/plans/session-08/`](docs/plans/session-08/README.md)
 - Plan Sesión 10 (híbrida + rerank): [`docs/plans/session-10/`](docs/plans/session-10/README.md)
+- Plan Sesión 11 (RAG grounded + RAGAS): [`docs/plans/session-11/`](docs/plans/session-11/README.md)
 - Diagnóstico S9: [`arquitectura-actual.md`](arquitectura-actual.md)
 - Medición retrieval S10: [`evals/retrieval/REPORT.md`](evals/retrieval/REPORT.md)
+- Informe RAGAS S11: [`evals/retrieval/RAGAS_REPORT.md`](evals/retrieval/RAGAS_REPORT.md)
 - Índice de documentación: [`docs/README.md`](docs/README.md)
 - Texto de ejemplo para `description`: [`docs/transcripcion-reunion.md`](docs/transcripcion-reunion.md)
 
@@ -666,4 +708,5 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 | `pre-session-08` | Postgres + pgvector + `POST /search` |
 | `session-09/pre-work` | Diagnóstico arquitectónico RAG |
 | `session-10/pre-work` | Híbrida (RRF) + reranker + medición A–D |
+| `session-11/pre-work` | Estimate RAG structured + `verify_citations` + RAGAS |
 | `main` | Línea base estable |

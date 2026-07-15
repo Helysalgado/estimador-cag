@@ -4,27 +4,32 @@
     {
       "id": "q01",
       "query": "E-commerce platform with product catalog, shopping cart and merchant admin panel",
-      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"],
+      "ground_truth": "Estimate for a headless e-commerce stack similar to ShopNova (BUD-2023-008): product catalog service ~140h (Elasticsearch-backed), checkout/cart with Stripe payment intents ~120h, merchant admin dashboard for orders/refunds ~100h. Multi-vendor marketplace catalog (BUD-2023-012) may add ~180h if multi-vendor is in scope. Total similar projects ~360–420h."
     },
     {
       "id": "q02",
       "query": "Mobile payments app with Stripe subscriptions and billing webhooks",
-      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"],
+      "ground_truth": "Closest grounded references: ShopNova checkout and payments (CHK-102) — cart, tax, Stripe payment intents with webhook reconciliation (~120h). GreenMarket split payouts (PAY-702) — Stripe Connect transfers/escrow (~140h). Subscriptions are not named explicitly; mark subscription-specific work as ungrounded assumption. Combined Stripe-related effort roughly 120–260h depending on Connect vs Checkout."
     },
     {
       "id": "q03",
       "query": "Integración de pagos con Stripe incluyendo webhooks de facturación",
-      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"],
+      "ground_truth": "Referencias: BUD-2023-008 CHK-102 (Stripe payment intents + reconciliación por webhooks, ~120h) y BUD-2023-012 PAY-702 (Stripe Connect, transfers, ~140h). Estimar integración de pagos/webhooks en ese rango; no inventar módulos de facturación SaaS fuera del contexto."
     },
     {
       "id": "q04",
       "query": "HIPAA-compliant patient portal with online appointment scheduling",
-      "relevant_budget_ids": ["BUD-2024-021", "BUD-2024-038"]
+      "relevant_budget_ids": ["BUD-2024-021", "BUD-2024-038"],
+      "ground_truth": "MediTrack (BUD-2024-021): HIPAA audit/encryption layer ~180h, patient portal UI (secure messaging, lab results, MFA) ~160h, appointment scheduling engine (calendars, SMS reminders, EHR hooks) ~180h; project total ~520h. LabResults (BUD-2024-038) adds FHIR lab results/patient viewer context (~80–180h components) if results viewing is needed."
     },
     {
       "id": "q05",
       "query": "Small gourmet shop wants to sell online: product catalog, loyalty points club, sales dashboard with stock charts, secure card payments at checkout, and order confirmation emails. Very unclear scope, mixed topics from a messy discovery call.",
-      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"]
+      "relevant_budget_ids": ["BUD-2023-008", "BUD-2023-012"],
+      "ground_truth": "Grounded from BUD-2023-008: catalog ~140h, Stripe checkout/cart ~120h, merchant admin dashboard ~100h. Loyalty points club and order confirmation emails are not in sample budgets — mark those lines ungrounded with assumptions. Optionally BUD-2023-012 multi-vendor catalog if marketplace-like. Prefer partial estimate with explicit ungrounded gaps over inventing hours for loyalty/email."
     }
   ]
 }

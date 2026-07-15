@@ -30,6 +30,11 @@
   - **[`plans/session-10/PLAN-IMPLEMENTACION.md`](./plans/session-10/PLAN-IMPLEMENTACION.md)** — plan detallado (material `mat-sesion10.md`)
   - **[`plans/session-10/GAP-ANALISIS.md`](./plans/session-10/GAP-ANALISIS.md)** — cumplimiento vs material
 
+- Sesión 11 (generación grounded + RAGAS):
+  - **[`plans/session-11/`](./plans/session-11/README.md)** — índice pre-ejercicio
+  - **[`plans/session-11/PLAN-IMPLEMENTACION.md`](./plans/session-11/PLAN-IMPLEMENTACION.md)** — plan detallado (material `mat-sesion11.md`)
+  - **[`plans/session-11/GAP-ANALISIS.md`](./plans/session-11/GAP-ANALISIS.md)** — cumplimiento vs material
+
 ## Texto de entrada de ejemplo
 
 - **`transcripcion-reunion.md`**: reunión ficticia con un cliente. Puedes pegar su contenido en el campo **`description`** del formulario Streamlit o del body JSON del API (mínimo 20 caracteres, máximo 80.000).

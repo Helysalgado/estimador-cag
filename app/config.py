@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K: int = 5
     RRF_SMOOTHING_K: int = 60
 
+    # Session 11 — grounded generation + RAGAS
+    RAG_GENERATION_MODEL: str = "gpt-4o-mini"
+    RAGAS_JUDGE_MODEL: str = "gpt-4o-mini"
+    RAGAS_EMBEDDING_MODEL: str = "text-embedding-3-small"
+
     class Config:
         env_file = ".env"
 

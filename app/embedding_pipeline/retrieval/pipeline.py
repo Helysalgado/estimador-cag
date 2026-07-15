@@ -69,11 +69,11 @@ async def retrieve(
     vector_limit = pool_size if wide else top_k
     lexical_limit = pool_size
 
+    # Sequential awaits: AsyncSession forbids concurrent ops on one session
+    # (asyncio.gather would race on connection provisioning).
     if search_mode == "hybrid":
-        vector_rows, lexical_rows = await asyncio.gather(
-            search_vector(session, query_vector, limit=vector_limit),
-            search_fulltext(session, query_text, limit=lexical_limit),
-        )
+        vector_rows = await search_vector(session, query_vector, limit=vector_limit)
+        lexical_rows = await search_fulltext(session, query_text, limit=lexical_limit)
     else:
         vector_rows = await search_vector(session, query_vector, limit=vector_limit)
         lexical_rows = []
