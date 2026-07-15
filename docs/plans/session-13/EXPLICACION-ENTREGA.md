@@ -1,6 +1,5 @@
 # Explicación de la entrega — Sesión 13 (orquestación LangGraph)
 
-Documento orientado al profesor: qué se hizo, por qué, y dónde verificarlo.
 
 **Rama:** `session-13/pre-work`  
 **Material de referencia:** `mat-sesion13.md` (Niveles 1–3)  
