@@ -21,10 +21,11 @@ Servicio de estimación de proyectos de software con **FastAPI**, **LiteLLM** y 
 | **Híbrida + rerank (Sesión 10)** | Full-text + RRF + cross-encoder (configs A–D) | `POST /api/v1/search` con `search_mode` / `rerank` |
 | **RAG grounded (Sesión 11)** | Estimación estructurada con citas por línea + RAGAS | `POST /api/v1/rag/estimate` |
 | **Agente (Sesión 12)** | Bucle tools: `search_budgets` + `calculate_estimate` + traza | `POST /api/v1/agent/estimate` |
+| **Grafo LangGraph (Sesión 13)** | Orquestación de 5 nodos + checkpointer + status | `POST /api/v1/graph/estimate` |
 
 El cliente **Streamlit** cubre formulario y conversación en pestañas; el pipeline de embeddings se consume por HTTP (curl, Swagger u otro backend).
 
-Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md) · [`session-10`](docs/plans/session-10/README.md) · [`session-11`](docs/plans/session-11/README.md) · [`session-12`](docs/plans/session-12/README.md).
+Parte del programa **Master en AI Engineering**. Referencia LIDR: [session_4/estimator](https://github.com/LIDR-academy/ai-engineering/tree/session_4/estimator). Planes locales: [`session-04`](docs/plans/session-04/README.md) · [`session-05`](docs/plans/session-05/README.md) · [`session-06`](docs/plans/session-06/README.md) · [`session-07`](docs/plans/session-07/README.md) · [`session-08`](docs/plans/session-08/README.md) · [`session-10`](docs/plans/session-10/README.md) · [`session-11`](docs/plans/session-11/README.md) · [`session-12`](docs/plans/session-12/README.md) · [`session-13`](docs/plans/session-13/README.md).
 
 ## Requisitos
 
@@ -81,6 +82,13 @@ Variables relevantes para la **Sesión 12** (agente):
 | `AGENT_DEBUG_MODEL` | `gpt-5-mini` | Smoke del bucle (`--debug`) |
 | `AGENT_REASONING_EFFORT` | `medium` | `reasoning.effort` Responses API |
 | `AGENT_MAX_ITERATIONS` | `12` | Tope de salvaguarda del bucle |
+
+Variables relevantes para la **Sesión 13** (LangGraph):
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `GRAPH_LLM_MODEL` | `gpt-4o-mini` | Extract / classify nodes |
+| `LOGFIRE_TOKEN` | (vacío) | Si vacío: Logfire local (`send_to_logfire=False`) |
 
 ## Cómo levantar
 
@@ -508,6 +516,42 @@ Rama: **`session-12/pre-work`**.
 
 ---
 
+## Modo 8 — Grafo LangGraph (Sesión 13)
+
+Orquestación **explícita** del flujo de estimación (Niveles 1–3 del material):
+
+```text
+START → extract_requirements → classify_components → search_budgets
+      → generate_estimate → validate_and_consolidate → END
+         (condicional: validated | needs_review)
+```
+
+Reutiliza retrieval S10 / tools S12 dentro de los nodos. Checkpointer `AsyncPostgresSaver` en el mismo Postgres. Spans Logfire por nodo.
+
+```bash
+# CLI + traza de entrega
+uv run python scripts/run_graph.py \
+  --transcript examples/agent/sample_transcript_complex.txt \
+  --out evals/agent/GRAPH_TRACE.md
+
+# HTTP
+curl -s -X POST http://localhost:8000/api/v1/graph/estimate \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n --rawfile t examples/agent/sample_transcript_complex.txt \
+      '{transcript:$t, estimation_id:"demo-thread-1"}')" | jq
+```
+
+| Pieza | Ubicación |
+|-------|-----------|
+| Grafo | `app/graph/` |
+| Endpoint | `POST /api/v1/graph/estimate` |
+| Traza | [`evals/agent/GRAPH_TRACE.md`](evals/agent/GRAPH_TRACE.md) |
+| Plan | [`docs/plans/session-13/`](docs/plans/session-13/README.md) |
+
+Rama: **`session-13/pre-work`**.
+
+---
+
 ## Adjuntos: Camino B (extracción local)
 
 No usamos visión del modelo ni RAG en esta fase. Los archivos se procesan **en el servidor** antes de llamar al LLM:
@@ -608,6 +652,7 @@ La suite no llama a APIs externas (LLM y Redis mockeados donde hace falta):
 | `tests/test_rrf_fusion.py` | Reciprocal Rank Fusion |
 | `tests/test_verify_citations.py` | Integridad de schema + citación colgante (S11) |
 | `tests/test_agent_tools.py` | `calculate_estimate` + schemas/tools/traza (S12, sin OpenAI) |
+| `tests/test_graph_routing.py` | Routing N3 + compile grafo (S13, sin OpenAI) |
 | `tests/test_similarity.py` | Similitud coseno (stdlib) |
 | `tests/test_embedding_benchmark.py` | Harness de benchmark (mock, sin red) |
 
@@ -683,6 +728,7 @@ estimador-cag/
 │   │   ├── embedding_benchmark.py
 │   │   └── SANITY_CHECK.md
 │   ├── agents/                 # Sesión 12: bucle tools + traza
+│   ├── graph/                  # Sesión 13: LangGraph StateGraph
 │   ├── schemas/
 │   │   ├── estimation.py
 │   │   └── sessions.py
@@ -711,16 +757,17 @@ estimador-cag/
 │   ├── measure_retrieval.py    # Sesión 10: configs A–D
 │   ├── eval_ragas.py           # Sesión 11: métricas RAGAS
 │   ├── run_agent.py            # Sesión 12: agente + traza
+│   ├── run_graph.py            # Sesión 13: grafo + GRAPH_TRACE
 │   └── validate_structure.py
 ├── examples/
 │   ├── transcripts/            # Sesión 9
 │   └── agent/                  # Sesión 12: sample_transcript_*.txt
 ├── evals/
 │   ├── retrieval/              # S10 REPORT + S11 RAGAS_REPORT + golden_set
-│   ├── agent/                  # Sesión 12: TRACE_complex.md
+│   ├── agent/                  # S12 TRACE + S13 GRAPH_TRACE
 │   ├── golden_dataset.json
 │   └── stress/
-├── docs/plans/session-04/ … session-12/
+├── docs/plans/session-04/ … session-13/
 ├── arquitectura-actual.md      # Sesión 9: diagnóstico
 └── pyproject.toml
 ```
@@ -763,6 +810,8 @@ Plantillas en `app/prompts/estimation/<version>/`. Para una nueva versión: copi
 | `AGENT_DEBUG_MODEL` | `gpt-5-mini` | Smoke agente S12 |
 | `AGENT_REASONING_EFFORT` | `medium` | Effort Responses API |
 | `AGENT_MAX_ITERATIONS` | `12` | Tope bucle agente |
+| `GRAPH_LLM_MODEL` | `gpt-4o-mini` | Nodos extract/classify (S13) |
+| `LOGFIRE_TOKEN` | — | Observabilidad Logfire (S13) |
 
 ### Si aparece 502 (`Upstream LLM call failed`)
 
@@ -795,10 +844,12 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 - Plan Sesión 10 (híbrida + rerank): [`docs/plans/session-10/`](docs/plans/session-10/README.md)
 - Plan Sesión 11 (RAG grounded + RAGAS): [`docs/plans/session-11/`](docs/plans/session-11/README.md)
 - Plan Sesión 12 (agente + tools): [`docs/plans/session-12/`](docs/plans/session-12/README.md)
+- Plan Sesión 13 (LangGraph): [`docs/plans/session-13/`](docs/plans/session-13/README.md)
 - Diagnóstico S9: [`arquitectura-actual.md`](arquitectura-actual.md)
 - Medición retrieval S10: [`evals/retrieval/REPORT.md`](evals/retrieval/REPORT.md)
 - Informe RAGAS S11: [`evals/retrieval/RAGAS_REPORT.md`](evals/retrieval/RAGAS_REPORT.md)
 - Traza agente S12: [`evals/agent/TRACE_complex.md`](evals/agent/TRACE_complex.md)
+- Traza grafo S13: [`evals/agent/GRAPH_TRACE.md`](evals/agent/GRAPH_TRACE.md)
 - Índice de documentación: [`docs/README.md`](docs/README.md)
 - Texto de ejemplo para `description`: [`docs/transcripcion-reunion.md`](docs/transcripcion-reunion.md)
 
@@ -813,4 +864,5 @@ En push/PR a `main`/`master`: validación de estructura y `pytest`.
 | `session-10/pre-work` | Híbrida (RRF) + reranker + medición A–D |
 | `session-11/pre-work` | Estimate RAG structured + `verify_citations` + RAGAS |
 | `session-12/pre-work` | Agente manual (`search_budgets` + `calculate_estimate`) + traza |
+| `session-13/pre-work` | LangGraph (N1–N3) + checkpointer + Logfire |
 | `main` | Línea base estable |

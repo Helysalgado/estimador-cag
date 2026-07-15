@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     AGENT_REASONING_EFFORT: str = "medium"
     AGENT_MAX_ITERATIONS: int = 12
 
+    # Session 13 — LangGraph orchestration
+    GRAPH_LLM_MODEL: str = "gpt-4o-mini"
+    LOGFIRE_TOKEN: Optional[str] = None
+
     class Config:
         env_file = ".env"
 

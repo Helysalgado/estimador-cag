@@ -4,19 +4,25 @@ import logging
 import structlog
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 
+from app.agents import router as agent_router
 from app.config import settings
 from app.db.session import dispose_engine
 from app.embedding_pipeline import router as embeddings_router
 from app.embedding_pipeline.errors import DuplicateDocumentError
-from app.agents import router as agent_router
 from app.embedding_pipeline.generation import router as rag_router
+from app.graph import router as graph_router
+from app.graph.build import build_graph
+from app.graph.checkpointer import checkpoint_postgres_uri
+from app.graph.observability import configure_logfire
 from app.routers import estimations, sessions
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Configure structured logging once per process."""
+    """Configure logging, Logfire, and the LangGraph checkpointer."""
     structlog.reset_defaults()
     processors = [
         structlog.contextvars.merge_contextvars,
@@ -33,7 +39,30 @@ async def lifespan(app: FastAPI):
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,
     )
+
+    configure_logfire()
+    try:
+        import logfire
+
+        logfire.instrument_fastapi(app)
+        logfire.instrument_httpx()
+    except Exception:  # noqa: BLE001 — observability must not block startup
+        structlog.get_logger(__name__).warning("logfire_instrumentation_skipped")
+
+    pool = AsyncConnectionPool(
+        conninfo=checkpoint_postgres_uri(),
+        kwargs={"autocommit": True, "prepare_threshold": 0},
+        open=False,
+    )
+    await pool.open()
+    checkpointer = AsyncPostgresSaver(pool)
+    await checkpointer.setup()
+    app.state.checkpoint_pool = pool
+    app.state.estimation_graph = build_graph(checkpointer)
+
     yield
+
+    await pool.close()
     await dispose_engine()
 
 
@@ -71,6 +100,7 @@ app.include_router(embeddings_router.search_router)
 app.include_router(embeddings_router.material_search_router)
 app.include_router(rag_router.router)
 app.include_router(agent_router.router)
+app.include_router(graph_router.router)
 
 
 # -------------------------
