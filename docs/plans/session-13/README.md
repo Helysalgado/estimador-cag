@@ -4,6 +4,7 @@ Pre-ejercicio: reexpresar la estimación como **grafo LangGraph** secuencial (5 
 
 | Documento | Contenido |
 |-----------|-----------|
+| **[EXPLICACION-ENTREGA.md](./EXPLICACION-ENTREGA.md)** | Qué se implementó (para explicar al profesor) |
 | **[PLAN-IMPLEMENTACION.md](./PLAN-IMPLEMENTACION.md)** | Plan detallado N1–N3 (`mat-sesion13.md`) |
 | **[GAP-ANALISIS.md](./GAP-ANALISIS.md)** | Estado actual vs material |
 | Material | `mat-sesion13.md` (ejercicio; artículos = lectura) |

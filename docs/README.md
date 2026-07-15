@@ -42,6 +42,7 @@
 
 - Sesión 13 (orquestación LangGraph):
   - **[`plans/session-13/`](./plans/session-13/README.md)** — índice pre-ejercicio
+  - **[`plans/session-13/EXPLICACION-ENTREGA.md`](./plans/session-13/EXPLICACION-ENTREGA.md)** — qué se implementó (explicación para el profesor)
   - **[`plans/session-13/PLAN-IMPLEMENTACION.md`](./plans/session-13/PLAN-IMPLEMENTACION.md)** — plan N1–N3 (material `mat-sesion13.md`)
   - **[`plans/session-13/GAP-ANALISIS.md`](./plans/session-13/GAP-ANALISIS.md)** — cumplimiento vs material
 
